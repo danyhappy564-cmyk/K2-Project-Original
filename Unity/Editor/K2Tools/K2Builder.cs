@@ -1,0 +1,294 @@
+// K2 본체(무기) 번들 빌더 — M4A1 무기 프리팹(추출본)을 복제해 메시·재질만 K2로 바꾸고 번들을 만든 뒤 다시 읽어 검사한다.
+// 실행: Unity -batchmode -quit -projectPath <SDK> -executeMethod K2Tools.K2Builder.BuildBody -k2Out <새 출력 폴더>
+//
+// 왜 M4A1 노드 위치를 그대로 두나: M4A1 애니메이션이 weapon 아래 노드(탄창 슬롯·손 마커·노리쇠·방아쇠·조준 카메라 등)의
+// 위치를 직접 움직인다. 노드를 옮겨도 애니메이션이 원래 값으로 덮어쓰므로, K2 모델 쪽을 M4A1 좌표계에 맞춰 넣는다.
+// 맞추는 방법: K2 기준점(Blender 리그 본 머리) 5개와 M4A1 노드 5개의 평균 차이만큼 K2 전체를 평행 이동(회전·배율 없음).
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using UnityEditor;
+using UnityEngine;
+
+namespace K2Tools
+{
+    public static class K2Builder
+    {
+        const string M4 = "Assets/K2Ripped/M4A1/Content/Weapons/m4a1/";
+        const string SRC = "Assets/K2/Source/";
+        // 번들 안 에셋 경로를 바닐라 규칙(번들 키와 같은 assets/content/weapons/<무기>/...)에 맞춘다 (body-v003)
+        const string OUT = "Assets/Content/Weapons/daewoo_k2/";
+        const string NAME = "weapon_daewoo_k2_556x45";
+        public const string BUNDLE = "assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle";
+        const string SHADER = "p0/Reflective/Bumped Specular SMap";
+
+        // K2 부품(FBX 오브젝트 이름 뒤쪽) ↔ M4A1 weapon 아래 노드 — 정렬 기준점(하부 조작부 4개, 위·앞뒤 평균).
+        // 탄창은 뺀다: K2 탄창 본 머리가 탄창 아래쪽이라 M4A1 mod_magazine(탄창 위쪽)과 116mm 어긋났다(body-v001).
+        static readonly (string k2, string m4)[] Anchors =
+        {
+            ("trigger", "weapon_trigger"), ("selector", "weapon_selector"),
+            ("bolt_release", "weapon_bolt_catch"), ("mag_release_R", "weapon_release"),
+        };
+        // 참고로만 오차를 기록하는 쌍
+        static readonly (string k2, string m4)[] InfoPairs = { ("magazine", "mod_magazine"), ("bolt_carrier", "weapon_bolt") };
+        // M4A1 메시 노드(weapon 기준 경로) → 들어갈 K2 부품
+        static readonly (string node, string part)[] Swaps =
+        {
+            ("weapon_colt_m4a1_556x45_LOD0", "lower"), ("weapon_colt_m4a1_556x45_LOD1", "lower"),
+            ("weapon_bolt", "bolt_carrier"), ("weapon_bolt_catch", "bolt_release"), ("weapon_release", "mag_release_R"),
+            ("weapon_selector", "selector"), ("weapon_trigger", "trigger"),
+        };
+        // 새로 붙이는 메시: (부모 노드, 부품) — M4A1에 대응 노드가 없는 K2 부품
+        static readonly (string parent, string part)[] Extras = { ("", "hammer"), ("weapon_release", "mag_release_L") };
+
+        static readonly StringBuilder Log = new StringBuilder();
+        static void L(string s) { Log.AppendLine(s); Debug.Log("K2BUILD " + s); }
+
+        static string Arg(string name)
+        {
+            var a = Environment.GetCommandLineArgs();
+            int i = Array.IndexOf(a, name);
+            return i >= 0 && i + 1 < a.Length ? a[i + 1] : null;
+        }
+
+        public static void BuildBody()
+        {
+            var outDir = Arg("-k2Out");
+            try
+            {
+                if (string.IsNullOrEmpty(outDir)) throw new Exception("-k2Out 필요");
+                if (Directory.Exists(outDir) && Directory.EnumerateFileSystemEntries(outDir).Any())
+                    throw new Exception("출력 폴더가 비어 있지 않음 — 덮어쓰지 않습니다: " + outDir);
+                Directory.CreateDirectory(outDir);
+
+                ConfigureImports();
+                var fbx = AssetDatabase.LoadAssetAtPath<GameObject>(SRC + "k2_parts.fbx");
+                if (!fbx) throw new Exception("FBX 없음");
+                var parts = fbx.GetComponentsInChildren<MeshFilter>(true)
+                    .ToDictionary(m => m.name.Replace("daewoo_K2_", ""), m => m.transform);
+                Vector3 P(string p) => parts[p].localPosition;   // FBX 루트 기준 = Unity 축(앞 +Z, 위 +Y)
+
+                // 축 확인: 총구가 개머리판보다 앞(+Z), 노리쇠가 탄창보다 위(+Y)
+                L($"축 확인: muzzle {P("muzzle")} stock {P("stock")} bolt {P("bolt_carrier")} mag {P("magazine")}");
+                if (!(P("muzzle").z > P("stock").z && P("bolt_carrier").y > P("magazine").y))
+                    throw new Exception("FBX 축이 예상과 다름 — 앞 +Z / 위 +Y가 아님. 내보내기 설정 확인 필요");
+
+                var mats = MakeMaterials(parts);
+                Directory.CreateDirectory(OUT);
+                string Copy(string from, string to)
+                {
+                    if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(to)) AssetDatabase.DeleteAsset(to);   // SDK 안 중간 산출물만 다시 만든다
+                    if (!AssetDatabase.CopyAsset(from, to)) throw new Exception("복사 실패 " + from);
+                    return to;
+                }
+                var modelPath = Copy(M4 + "weapon_colt_m4a1_556x45_model.generated.prefab", OUT + NAME + "_model.generated.prefab");
+                var simplePath = Copy(M4 + "weapon_colt_m4a1_556x45_model_simple.generated.prefab", OUT + NAME + "_model_simple.generated.prefab");
+                var containerPath = Copy(M4 + "weapon_colt_m4a1_556x45_container.prefab", OUT + NAME + "_container.prefab");
+
+                Vector3 offset = Vector3.zero;
+                EditModel(modelPath, NAME + "_model.generated", parts, mats, ref offset, true);
+                EditModel(simplePath, NAME + "_model_simple.generated", parts, mats, ref offset, false);
+                EditContainer(containerPath, modelPath, simplePath);
+                AssetDatabase.SaveAssets();
+
+                var build = new AssetBundleBuild { assetBundleName = BUNDLE, assetNames = new[] { containerPath } };
+                var manifest = BuildPipeline.BuildAssetBundles(outDir, new[] { build }, BuildAssetBundleOptions.ChunkBasedCompression, BuildTarget.StandaloneWindows64);
+                if (manifest == null) throw new Exception("번들 빌드 실패");
+                var built = Path.Combine(outDir, BUNDLE);
+                L($"번들: {built} ({new FileInfo(built).Length / 1048576.0:0.0} MB)");
+                Verify(built, outDir);
+                L("완료");
+            }
+            catch (Exception e) { L("FAIL " + e); Save(outDir); EditorApplication.Exit(1); return; }
+            Save(outDir);
+        }
+
+        static void Save(string outDir)
+        {
+            if (string.IsNullOrEmpty(outDir)) return;
+            Directory.CreateDirectory(outDir);
+            File.WriteAllText(Path.Combine(outDir, "build-log.txt"), Log.ToString(), new UTF8Encoding(false));
+        }
+
+        static void ConfigureImports()
+        {
+            var mi = (ModelImporter)AssetImporter.GetAtPath(SRC + "k2_parts.fbx");
+            mi.globalScale = 1; mi.useFileScale = true; mi.bakeAxisConversion = false;
+            mi.importAnimation = false; mi.animationType = ModelImporterAnimationType.None;
+            mi.materialImportMode = ModelImporterMaterialImportMode.ImportViaMaterialDescription;   // 재질 이름(슬롯 순서)을 읽기 위해서만
+            mi.importTangents = ModelImporterTangents.CalculateMikk; mi.isReadable = false;
+            mi.SaveAndReimport();
+            foreach (var png in Directory.GetFiles(SRC + "Textures", "*.png"))
+            {
+                var ti = (TextureImporter)AssetImporter.GetAtPath(png.Replace('\\', '/'));
+                ti.maxTextureSize = 2048; ti.mipmapEnabled = true;
+                ti.textureType = png.EndsWith("_normal.png") ? TextureImporterType.NormalMap : TextureImporterType.Default;
+                ti.alphaSource = TextureImporterAlphaSource.FromInput; ti.alphaIsTransparency = false;
+                ti.SaveAndReimport();
+            }
+        }
+
+        // FBX 재질 이름 → EFT 셰이더 재질 (값은 M4A1 재질에서 가져옴)
+        static Dictionary<string, Material> MakeMaterials(Dictionary<string, Transform> parts)
+        {
+            var shader = Shader.Find(SHADER);
+            if (!shader) throw new Exception("셰이더 없음: " + SHADER);
+            Directory.CreateDirectory(OUT + "Materials");
+            var names = parts.Values.SelectMany(t => t.GetComponent<MeshRenderer>().sharedMaterials).Where(m => m).Select(m => m.name).Distinct();
+            var result = new Dictionary<string, Material>();
+            foreach (var n in names)
+            {
+                var tex = SRC + "Textures/" + n;
+                var m = new Material(shader) { name = NAME + "_" + n.Replace("daewoo_K2_", "") };
+                m.SetTexture("_MainTex", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + "_main.png"));
+                m.SetTexture("_SpecMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + "_spec.png"));
+                m.SetTexture("_BumpMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + "_normal.png"));
+                m.SetFloat("_Glossness", 1); m.SetFloat("_Specularness", 1);
+                m.SetColor("_Color", Color.white); m.SetColor("_SpecColor", Color.white);
+                m.SetColor("_ReflectColor", new Color(0.2924528f, 0.29107332f, 0.29107332f, 0.5019608f));
+                m.SetVector("_DefVals", new Vector4(1, 0.5f, 0, 0)); m.SetVector("_SpecVals", new Vector4(1, 0.5f, 0, 0));
+                var path = OUT + "Materials/" + m.name + ".mat";
+                if (AssetDatabase.LoadAssetAtPath<Material>(path)) AssetDatabase.DeleteAsset(path);
+                AssetDatabase.CreateAsset(m, path);
+                result[n] = m;
+                if (!m.GetTexture("_MainTex")) L("경고: 텍스처 없음 " + n);
+            }
+            return result;
+        }
+
+        static Material[] MatsFor(Transform part, Dictionary<string, Material> mats) =>
+            part.GetComponent<MeshRenderer>().sharedMaterials.Select(m => m ? mats[m.name] : null).ToArray();
+
+        static void EditModel(string path, string rootName, Dictionary<string, Transform> parts, Dictionary<string, Material> mats, ref Vector3 offset, bool computeOffset)
+        {
+            var root = PrefabUtility.LoadPrefabContents(path);
+            try
+            {
+                root.name = rootName;
+                var weapon = root.transform.Find("Weapon_root/Weapon_root_anim/weapon");
+                if (!weapon) throw new Exception("weapon 노드 없음: " + path);
+                Vector3 RootPos(Transform t) => root.transform.InverseTransformPoint(t.position);
+
+                if (computeOffset)
+                {
+                    var diffs = Anchors.Select(a => RootPos(weapon.Find(a.m4)) - parts[a.k2].localPosition).ToArray();
+                    offset = diffs.Aggregate(Vector3.zero, (s, d) => s + d) / diffs.Length;
+                    // 좌우는 총 중심선끼리: K2 노리쇠 중심(x) = M4A1 weapon_bolt 중심(x)
+                    offset.x = RootPos(weapon.Find("weapon_bolt")).x - parts["bolt_carrier"].localPosition.x;
+                    L($"정렬 이동량(K2→M4, m): {offset.x:0.0000} {offset.y:0.0000} {offset.z:0.0000}");
+                    foreach (var (k2, m4) in Anchors.Concat(InfoPairs))
+                    {
+                        var r = RootPos(weapon.Find(m4)) - parts[k2].localPosition - offset;
+                        L($"  {(Anchors.Contains((k2, m4)) ? "기준점" : "참고  ")} {k2,-14} ↔ {m4,-18} 남은 차이 {r.magnitude * 1000:0.0} mm  (x{r.x * 1000:0}, y{r.y * 1000:0}, z{r.z * 1000:0})");
+                    }
+                }
+                var off = offset;
+                void Place(Transform t, string part)
+                {
+                    var src = parts[part];
+                    t.position = root.transform.TransformPoint(src.localPosition + off);
+                    t.rotation = root.transform.rotation;
+                    var mesh = src.GetComponent<MeshFilter>().sharedMesh;
+                    var mf = t.GetComponent<MeshFilter>(); var mr = t.GetComponent<MeshRenderer>();
+                    if (mf) mf.sharedMesh = mesh;
+                    if (mr) mr.sharedMaterials = MatsFor(src, mats);
+                    var bc = t.GetComponent<BoxCollider>();
+                    if (bc) { bc.center = mesh.bounds.center; bc.size = mesh.bounds.size; }
+                }
+
+                var lod = root.GetComponent<LODGroup>();
+                var lod0Extra = new List<Renderer>();
+                foreach (var (node, part) in Swaps)
+                {
+                    var n = weapon.Find(node);
+                    if (!n) { L($"  {rootName}: 노드 없음 {node} — 건너뜀"); continue; }
+                    // 메시가 노드 자신에 있거나(본체 LOD) 자식에 있다(움직이는 부품 — 노드는 애니메이션용이라 그대로 둔다).
+                    var targets = n.GetComponent<MeshFilter>() || n.GetComponent<BoxCollider>() ? new[] { n }
+                        : n.Cast<Transform>().Where(c => c.GetComponent<MeshFilter>() || c.GetComponent<BoxCollider>()).ToArray();
+                    foreach (var t in targets) Place(t, part);
+                    L($"  {rootName}: {node} → {part} ({targets.Length}개)");
+                }
+                foreach (var (parent, part) in Extras)
+                {
+                    var p = parent == "" ? weapon : weapon.Find(parent);
+                    var go = new GameObject(part + "_LOD0");
+                    go.transform.SetParent(p, false);
+                    go.AddComponent<MeshFilter>(); go.AddComponent<MeshRenderer>();
+                    Place(go.transform, part);
+                    lod0Extra.Add(go.GetComponent<MeshRenderer>());
+                    L($"  {rootName}: 추가 {part} (부모 {(parent == "" ? "weapon" : parent)})");
+                }
+                if (lod)
+                {
+                    var lods = lod.GetLODs();
+                    lods[0].renderers = lods[0].renderers.Where(r => r).Concat(lod0Extra).ToArray();
+                    lod.SetLODs(lods); lod.RecalculateBounds();
+                }
+                PrefabUtility.SaveAsPrefabAsset(root, path);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        static void EditContainer(string path, string modelPath, string simplePath)
+        {
+            var root = PrefabUtility.LoadPrefabContents(path);
+            try
+            {
+                root.name = NAME + "_container";
+                var wp = root.GetComponents<MonoBehaviour>().FirstOrDefault(c => c && c.GetType().Name == "WeaponPrefab");
+                if (!wp) throw new Exception("WeaponPrefab 없음");
+                var so = new SerializedObject(wp);
+                so.FindProperty("_weaponObject").objectReferenceValue = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
+                so.FindProperty("_weaponObjectSimple").objectReferenceValue = AssetDatabase.LoadAssetAtPath<GameObject>(simplePath);
+                so.ApplyModifiedPropertiesWithoutUndo();
+                L("container: _weaponObject/_weaponObjectSimple → K2 모델, 애니메이터는 M4A1 것 유지");
+                PrefabUtility.SaveAsPrefabAsset(root, path);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        // 만든 번들을 다시 열어 내용 확인 → validation.json
+        static void Verify(string bundlePath, string outDir)
+        {
+            AssetBundle.UnloadAllAssetBundles(true);
+            var b = AssetBundle.LoadFromFile(bundlePath);
+            if (!b) throw new Exception("번들 다시 읽기 실패");
+            try
+            {
+                var names = b.GetAllAssetNames();
+                var all = b.LoadAllAssets();
+                var sb = new StringBuilder("{\"bundle\":\"" + BUNDLE + "\",\"assets\":[" + string.Join(",", names.Select(n => "\"" + n + "\"")) + "],");
+                var types = all.GroupBy(o => o.GetType().Name).Select(g => $"\"{g.Key}\":{g.Count()}");
+                sb.Append("\"types\":{" + string.Join(",", types) + "},");
+                var container = all.OfType<GameObject>().FirstOrDefault(g => g.name == NAME + "_container");
+                if (!container) throw new Exception("다시 읽은 번들에 container 없음");
+                var wp = container.GetComponents<MonoBehaviour>().FirstOrDefault(c => c && c.GetType().Name == "WeaponPrefab");
+                string Ref(string field)
+                {
+                    var f = wp.GetType().GetField(field, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+                    var v = f?.GetValue(wp) as UnityEngine.Object;
+                    return v ? v.name : "null";
+                }
+                var refs = new[] { "_weaponObject", "_weaponObjectSimple", "_originalAnimatorController", "_animatorSimple", "_animatorSpirit" }
+                    .Select(f => $"\"{f}\":\"{Ref(f)}\"");
+                sb.Append("\"weaponPrefab\":{" + string.Join(",", refs) + "},");
+                // 모델 프리팹은 명시 에셋이 아니라 의존 에셋이라 이름으로 못 꺼낸다 → WeaponPrefab 참조로 찾는다
+                var modelRef = wp.GetType().GetField("_weaponObject", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public)?.GetValue(wp) as GameObject;
+                if (!modelRef) throw new Exception("_weaponObject 참조가 비어 있음");
+                var model = (GameObject)UnityEngine.Object.Instantiate(modelRef);
+                var rs = model.GetComponentsInChildren<MeshRenderer>(true);
+                var meshes = rs.Select(r => r.GetComponent<MeshFilter>().sharedMesh).Where(m => m).ToArray();
+                var bounds = rs.Select(r => r.bounds).Aggregate((a, c) => { a.Encapsulate(c); return a; });
+                sb.Append($"\"modelRenderers\":{rs.Length},\"meshNames\":[" + string.Join(",", meshes.Select(m => "\"" + m.name + "\"")) + "],");
+                sb.Append($"\"vertices\":{meshes.Sum(m => m.vertexCount)},\"modelBoundsSize\":[{bounds.size.x:0.0000},{bounds.size.y:0.0000},{bounds.size.z:0.0000}],");
+                sb.Append("\"shaders\":[" + string.Join(",", rs.SelectMany(r => r.sharedMaterials).Where(m => m).Select(m => "\"" + m.shader.name + "\"").Distinct()) + "]}");
+                File.WriteAllText(Path.Combine(outDir, "validation.json"), sb.ToString(), new UTF8Encoding(false));
+                L("재읽기: " + string.Join(", ", refs) + $" / 렌더러 {rs.Length} / 범위 {bounds.size}");
+                UnityEngine.Object.DestroyImmediate(model);
+            }
+            finally { b.Unload(true); }
+        }
+    }
+}
