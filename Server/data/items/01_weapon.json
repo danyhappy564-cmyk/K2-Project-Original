@@ -1,6 +1,6 @@
 {
   "newId": "d22000000000000000000001",
-  "itemTplToClone": "6184055050224f204c1da540",
+  "itemTplToClone": "5ac66cb05acfc40198510a10",
   "parentId": "5447b5f14bdc2d61278b4567",
   "newItemName": "weapon_daewoo_k2_556x45",
   "handbookParentId": "5b5f78fc86f77409407a7f90",
@@ -14,10 +14,7 @@
     "Weight": 1,
     "ExaminedByDefault": true,
     "CanSellOnRagfair": false,
-    "bFirerate": 750,
-    "Foldable": true,
-    "FoldedSlot": "mod_stock",
-    "Width": 4
+    "bFirerate": 750
   },
   "locales": {
     "en": {
