@@ -39,6 +39,8 @@ BAKE_L = ['F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles
 # 1인칭 손은 팔 뼈가 아니라 IK 마커(weapon_L/R_IK_marker, 총 기준)를 따른다(EFT Player.IkProcess — 마커가 손 기준점 10cm 안이면 손잡이 자세로 빨려 듦).
 # 접기 오른손(0.9.4): 오른손이 손잡이를 놓고 개머리판을 잡아 접은 뒤 돌아오는 마커 궤적(K2AnimBakeFoldR, 총 굴림 거울 뒤 기준). 없으면 건너뜀(1차 빌드).
 BAKE_FOLD_R = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldR-fr013/fold-right.json'   # 0.9.5: G36 오른손 상대 자세 이식(K2AnimBakeFoldDonor)
+BAKE_CATCH = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-catch-c002/catch.json'   # 0.9.6: 빈 탄창 장전 charge_2 → M4식 멈치 때리기(K2AnimBakeCatch)
+BAKE_FOLD_W = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldW-w002/fold-weapon.json'   # 0.9.6: G36 총 궤적 이식(K2AnimBakeFoldWeapon) — 0.9.5는 개머리판이 얼굴 앞이라 팔이 꺾임
 MAG_SEAT = (-0.0001, -0.4402, -0.0241)   # AK 탄창 끼운 자리(무기 좌표)
 # 조정간(0.9.5): K2 조정간 메시를 weapon_selector에 분리(K2Builder, ak-v019) — 노드를 K2 축으로(빌드 출력 selector-pivot.json), 회전은 M16식.
 # 메시는 노드 회전 x 5.85°(AK 프리팹 기본)에서 구웠다 = K2 안전(레버 앞). 단발 = 위로 90°, 연발 = 뒤로 180°(+x축 기준 음수가 앞→위).
@@ -46,6 +48,7 @@ MAG_SEAT = (-0.0001, -0.4402, -0.0241)   # AK 탄창 끼운 자리(무기 좌표
 SELECTOR_PIVOT = (-0.003088481, -0.284393162, -0.0126879439)
 SELECTOR_SCALE = 90 / (5.793 - 0.445); SELECTOR_ADD = -174.15 - 0.445 * SELECTOR_SCALE
 RELEASE_ANGLE, RELEASE_PUSH = 28.0, 0.003   # AK 멈치 최대 회전(°) → K2 버튼 눌림(m)
+MAG_TIME = 0.12   # 0.9.6: 곧은 경로·높이·쥔 손 비중 전환을 시간으로 최소 약 2×0.12초에 걸쳐(tsmooth)
 MAG_STRAIGHT, MAG_BLEND = 0.08, 0.13      # 이 거리 안은 곧은 경로, 그 사이는 섞음(K2 탄창은 끼우면 입구 위로 53mm 들어감)
 # 약실 총알·탄피 배출 자리(0.9.3): AK patron_in_weapon(y −0.4555, z −0.0007)이 K2 약실(총열 뒤끝 y −0.4292, 축 z +0.0255)보다
 # 26mm 앞·26mm 아래라 약실 확인 때 총알이 몸통 밖으로 보였다(인게임). 무기 좌표 (0, +0.0263, +0.0262) 이동 — 모든 클립 + 컨테이너 기본값.
@@ -74,6 +77,20 @@ F32 = lambda x: struct.unpack('<f', struct.pack('<f', x))[0]
 
 def smooth(a, b, x):
     u = min(1.0, max(0.0, (x - a) / (b - a))); return u * u * (3 - 2 * u)
+
+
+def tsmooth(w, r, dilate=True):
+    """프레임별 비중을 시간 축에서 매끄럽게(0.9.6): 넓히기(앞뒤 r프레임 최대) 후 삼각 평균(반폭 r). 거리로만 정하면 탄창이 그 거리 구간을
+    1~2프레임에 지나갈 때 비중이 0→1로 튀어 속도가 순간 2배 이상(탄 검사 0.9→2.2m/s, 인게임 "프레임이 모자란 듯 부자연스러움")."""
+    n = len(w)
+    if dilate: w = [max(w[max(0, i - r):i + r + 1]) for i in range(n)]
+    out = []
+    for i in range(n):
+        acc = wt = 0.0
+        for j in range(max(0, i - r), min(n, i + r + 1)):
+            k = r + 1 - abs(i - j); acc += w[j] * k; wt += k
+        out.append(acc / wt)
+    return out
 
 
 def dense_times(t):
@@ -183,6 +200,16 @@ def main():
         fj = json.loads(pathlib.Path(BAKE_FOLD_R).read_text(encoding='utf-8')); assert fj['passed'], fj['error']
         fold_r = {c['name']: c for c in fj['clips']}
     print('접기 오른손 궤적', list(fold_r) or '없음(1차 빌드)')
+    fold_w = {}
+    if pathlib.Path(BAKE_FOLD_W).exists():
+        wj = json.loads(pathlib.Path(BAKE_FOLD_W).read_text(encoding='utf-8')); assert wj['passed'], wj['error']
+        fold_w = {c['name']: c for c in wj['clips']}
+    print('접기 총 궤적', list(fold_w) or '없음(1차 빌드)')
+    catch = {}
+    if pathlib.Path(BAKE_CATCH).exists():
+        cj = json.loads(pathlib.Path(BAKE_CATCH).read_text(encoding='utf-8')); assert cj['passed'], cj['error']
+        catch = {cj['clip']: cj}; baked.pop(cj['clip'], None)   # Codex 왼팔(오른쪽 손잡이로 넘어감) 대신
+    print('멈치 때리기', list(catch) or '없음')
     changed = {}; changes = []
     for data in baked.values():
         for sample in data['frames']:
@@ -236,7 +263,7 @@ def main():
         solved = set()
         if t['m_Name'] in baked:
             sd = baked[t['m_Name']]['side']; solved = {'Base Human' + sd + n for n in ('Upperarm', 'Forearm1', 'Palm')}
-        for names in ([R_ARM, L_ARM] if t['m_Name'] in SELECTOR else []) + ([L_ARM] if t['m_Name'] in FOLD else []):
+        for names in ([R_ARM, L_ARM] if t['m_Name'] in SELECTOR else []) + ([L_ARM] if t['m_Name'] in FOLD or t['m_Name'] in catch else []):
             for b in bs:
                 last = b['path'].split('/')[-1]
                 if last in solved and b['attribute'] == 4: continue
@@ -276,13 +303,16 @@ def main():
                 lin(t, pb['offset'] + 2, add=LIFT); row.setdefault('mag', []).append(nm + ':fixed'); continue
             assert rb, (t['m_Name'], nm, '회전 곡선 없음')   # 밀집·스트림 모두 set_samples가 처리
             newP, newR = [], []
+            r = round(MAG_TIME * clipdata(t)['m_DenseClip']['m_SampleRate'])
+            K = tsmooth([1 - smooth(MAG_STRAIGHT, MAG_BLEND, x) for x in d], r)   # 1 = 곧은 경로
+            LW = tsmooth([1 - smooth(0.06, 0.12, x) for x in d], r)
             for f in range(n):
                 q_old = clip_quat([R[0][f], R[1][f], R[2][f]]); p_old = [P[0][f], P[1][f], P[2][f]]
-                k = 1 - smooth(MAG_STRAIGHT, MAG_BLEND, d[f])           # 1 = 곧은 경로
+                k = K[f]
                 p_s = [MAG_SEAT[0], MAG_SEAT[1], MAG_SEAT[2] - d[f]]
                 p_n = [p_old[j] + (p_s[j] - p_old[j]) * k for j in range(3)]
                 q_n = qslerp(q_old, (0.0, 0.0, 0.0, 1.0), k)
-                lift = LIFT * (1 - smooth(0.06, 0.12, d[f])); p_n[2] += lift
+                lift = LIFT * LW[f]; p_n[2] += lift
                 newP.append(p_n); newR.append(q_n)
             for j in range(3): set_samples(t, pb['offset'] + j, [x[j] for x in newP])
             eul = unwrap([quat_clip(q) for q in newR], [[R[0][f], R[1][f], R[2][f]] for f in range(n)])
@@ -294,12 +324,19 @@ def main():
             if not lm: continue
             L = [curve_values(t, lm, j) for j in range(3)]; LR = [curve_values(t, lr, j) for j in range(3)] if lr else None
             hd = [math.dist([L[0][f], L[1][f], L[2][f]], [P[0][f], P[1][f], P[2][f]]) for f in range(n)]
-            held_frames = [hd[f] for f in range(n) if d[f] > 0.05]
-            if not held_frames: continue
+            # 탄창 순간이동(교체 표시 — mag_hit·mag_admin, 프레임당 >4m/s) 앞뒤 프레임은 쥔 손 계산·따라가기에서 뺀다(0.9.6: 손이 같이 튐)
+            rate = clipdata(t)['m_DenseClip']['m_SampleRate']
+            jump = [f > 0 and math.dist([P[j][f] for j in range(3)], [P[j][f - 1] for j in range(3)]) * rate > 4 for f in range(n)]
+            tele = {g for f in range(n) if jump[f] for g in (f - 2, f - 1, f, f + 1)}
+            held_frames = [hd[f] for f in range(n) if d[f] > 0.05 and f not in tele]
+            if tele: row['magTele'] = len(tele); continue   # 탄창 순간이동 클립(버리기·교체 표시: mag_hit·mag_admin·mag_out_all) — 손은 탄창을 쥐고 있지 않다(바닐라 손 거의 정지)
+            if len(held_frames) < 0.15 * rate: continue   # 실제로 빼서 들고 있는 구간이 없음
             hold = statistics.median(held_frames)
+            if sum(abs(x - hold) < 0.02 for x in held_frames) < 0.7 * len(held_frames): continue   # 손–탄창 거리가 일정하지 않음 = 쥐고 있지 않음(떨어뜨림)
             outP, outR, moved = [], [], 0.0
+            HW = tsmooth([0.0 if f in tele else 1 - smooth(0.02, 0.05, abs(hd[f] - hold)) for f in range(n)], r, dilate=False)
             for f in range(n):
-                hw = 1 - smooth(0.02, 0.05, abs(hd[f] - hold))
+                hw = HW[f]
                 q_old = clip_quat([R[0][f], R[1][f], R[2][f]]); delta = qmul(newR[f], qinv(q_old))
                 lp = [L[0][f], L[1][f], L[2][f]]; rel = [lp[j] - P[j][f] for j in range(3)]
                 rigid = [newP[f][j] + qrot(delta, rel)[j] for j in range(3)]
@@ -349,6 +386,41 @@ def main():
                                 v = unity_to_clip(f['rot'])[ax]; v += 360 * round((prev - v) / 360); vals.append(v); prev = v
                         set_samples(t, b['offset'] + j, vals)
                     row.setdefault('foldR', []).append(b['attribute'])
+        # 접기 총 궤적(0.9.6): weapon 노드 위치·회전 = G36이 접을 때 총을 내미는 움직임(1차 결과 = 거울 적용 후 기준으로 구운 값이라 거울 뒤에 덮어씀)
+        if t['m_Name'] in fold_w:
+            fw = fold_w[t['m_Name']]
+            for b in bs:
+                if b['path'].split('/')[-1] == 'weapon' and b['attribute'] in (1, 4):
+                    n = len(curve_values(t, b, 0)); assert n == len(fw['frames']), (t['m_Name'], n, len(fw['frames']))
+                    for j, ax in enumerate('xyz'):
+                        if b['attribute'] == 1: vals = [f['pos'][ax] for f in fw['frames']]
+                        else:
+                            vals = []; prev = curve_values(t, b, j)[0]
+                            for f in fw['frames']:
+                                v = unity_to_clip(f['rot'])[ax]; v += 360 * round((prev - v) / 360); vals.append(v); prev = v
+                        set_samples(t, b['offset'] + j, vals)
+                    row.setdefault('foldW', []).append((b['attribute'], b['storage']))
+        # 멈치 때리기(0.9.6): 총·왼손 IK 마커·왼손가락·노리쇠 위치 = K2AnimBakeCatch(M4 m4a1_reload_catch_0 이식). 왼팔 뼈는 위에서 첫 값 고정.
+        if t['m_Name'] in catch:
+            cf = catch[t['m_Name']]['frames']
+            def put(b, key, rot):
+                n = len(curve_values(t, b, 0)); assert n == len(cf), (t['m_Name'], b['path'], n, len(cf))
+                for j, ax in enumerate('xyz'):
+                    if not rot: vals = [key(f)[ax] for f in cf]
+                    else:
+                        vals = []; prev = curve_values(t, b, j)[0]
+                        for f in cf:
+                            v = unity_to_clip(key(f))[ax]; v += 360 * round((prev - v) / 360); vals.append(v); prev = v
+                    set_samples(t, b['offset'] + j, vals)
+            fingers = {x['name'] for x in cf[0]['fingers']}
+            for b in bs:
+                last = b['path'].split('/')[-1]
+                if last == 'weapon' and b['attribute'] in (1, 4): put(b, (lambda f: f['weaponPos']) if b['attribute'] == 1 else (lambda f: f['weaponRot']), b['attribute'] == 4)
+                elif last == 'weapon_L_IK_marker' and b['attribute'] in (1, 4): put(b, (lambda f: f['lPos']) if b['attribute'] == 1 else (lambda f: f['lRot']), b['attribute'] == 4)
+                elif last == 'weapon_bolt' and b['attribute'] == 1: put(b, lambda f: f['boltPos'], False)
+                elif last in fingers and b['attribute'] == 4: put(b, lambda f, nm=last: next(x['rot'] for x in f['fingers'] if x['name'] == nm), True)
+                else: continue
+                row.setdefault('catch', []).append(last + ':' + str(b['attribute']))
         changed[ident] = t; changes.append(row)
     assert len(changed) == 98, len(changed)
 
