@@ -1,5 +1,6 @@
 // 기본 자세에서 오른손 검지가 K2 방아쇠에 닿는지 — 검지 끝·방아쇠 메시 위치(무기 좌표)와 확대 렌더.
 // 실행: -executeMethod K2Tools.K2TriggerCheck.Run -k2Mod <번들 폴더(bundles.json 위)> -k2Game <StreamingAssets/Windows> -k2Clip <클립 이름> -k2Out <폴더> -k2Label <이름>
+//        [-k2Look <노드, 기본 weapon_trigger>] [-k2Cam <무기 좌표 시점 방향 x,y,z>] [-k2Size <화면 반높이 m>] [-k2Time <0~1 클립 비율>]
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -47,7 +48,8 @@ namespace K2Tools
                     var prefab = Load(partKeys[i]).LoadAllAssets<GameObject>().Single(); var go = UnityEngine.Object.Instantiate(prefab);
                     go.transform.SetParent(Find(model.transform, slots[i]), false); go.transform.localPosition = Vector3.zero; go.transform.localRotation = Quaternion.Euler(90, 0, 0) * prefab.transform.localRotation;
                 }
-                clip.SampleAnimation(model, 0f);
+                float frac = float.TryParse(A("-k2Time"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var fr) ? fr : 0f;
+                clip.SampleAnimation(model, clip.length * frac);
                 var weapon = Find(model.transform, "weapon");
                 Vector3 W(Vector3 p) => weapon.InverseTransformPoint(p);
                 foreach (var n in new[] { "Base HumanRDigit21", "Base HumanRDigit22", "Base HumanRDigit23", "Base HumanRPalm", "weapon_trigger", "aim_camera" })
@@ -72,12 +74,14 @@ namespace K2Tools
                     c.transform.position = (a + bpos) / 2; c.transform.rotation = Quaternion.FromToRotation(Vector3.up, dd.normalized);
                     float rad = t.name.Contains("Digit") ? .003f : .007f; c.transform.localScale = new Vector3(rad * 2, dd.magnitude / 2, rad * 2); c.GetComponent<Renderer>().sharedMaterial = hand;
                 }
-                var cam = new GameObject("C").AddComponent<Camera>(); cam.orthographic = true; cam.orthographicSize = .09f; cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(.06f, .07f, .09f); cam.nearClipPlane = .01f; cam.farClipPlane = 5;
-                var look = Find(model.transform, "weapon_trigger").position;
-                cam.transform.position = look + weapon.TransformVector(new Vector3(.6f, 0, 0)); cam.transform.rotation = Quaternion.LookRotation(look - cam.transform.position, weapon.TransformDirection(Vector3.forward));
+                var cam = new GameObject("C").AddComponent<Camera>(); cam.orthographic = true; cam.orthographicSize = float.TryParse(A("-k2Size"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var sz) ? sz : .09f; cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(.06f, .07f, .09f); cam.nearClipPlane = .01f; cam.farClipPlane = 5;
+                var look = Find(model.transform, A("-k2Look") ?? "weapon_trigger").position;
+                var cv = (A("-k2Cam") ?? "0.6,0,0").Split(',').Select(x => float.Parse(x, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+                var dir = new Vector3(cv[0], cv[1], cv[2]); var up = Mathf.Abs(dir.normalized.z) > .9f ? Vector3.down : Vector3.forward;
+                cam.transform.position = look + weapon.TransformVector(dir); cam.transform.rotation = Quaternion.LookRotation(look - cam.transform.position, weapon.TransformDirection(up));
                 var rt = new RenderTexture(900, 700, 24); cam.targetTexture = rt; cam.Render(); RenderTexture.active = rt;
                 var tex = new Texture2D(900, 700, TextureFormat.RGB24, false); tex.ReadPixels(new Rect(0, 0, 900, 700), 0, 0); tex.Apply();
-                File.WriteAllBytes(Path.Combine(outDir, $"trigger-{label}-{name}.png"), tex.EncodeToPNG()); RenderTexture.active = null;
+                File.WriteAllBytes(Path.Combine(outDir, $"{label}-{name}-{frac:0.##}.png"), tex.EncodeToPNG()); RenderTexture.active = null;
             }
             catch (Exception e) { log.AppendLine("FAIL " + e); }
             File.AppendAllText(Path.Combine(outDir, "trigger-check.txt"), log.ToString());

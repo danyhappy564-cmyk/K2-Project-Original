@@ -1,17 +1,21 @@
-"""K2 동작 번들(anim-v004, Claude) — Codex build_final_anim_v003b.py를 바탕으로 접기 위치만 다른 방식으로.
+"""K2 동작 번들(0.9.1, Claude) — AK-101 override 컨트롤러 3개 + 수정 클립 98개. 기반 컨트롤러·fast 데이터는 바닐라(kb 9.20).
 
-Codex v003b: 접기 위치 곡선(스트림)을 프레임마다 키를 새로 넣어 다시 인코딩 → Unity SampleAnimation에서 네이티브 크래시(EvaluateClip).
-여기서는 다시 인코딩하지 않는다. 오른쪽 접기 = 총 중심선(x=0) 기준 좌우 거울:
-  모든 클립의 mod_stock 위치 x → −x(펼친 축 −15.3mm → +15.3mm), 접기 클립은 회전 오일러 y·z 부호 반전(어떤 회전 순서든 M·R·M).
-  둘 다 기존 키 계수의 선형 변환이라 modify_scalar(scale)로 끝난다(스트림 키 수·구조 불변).
-  축이 30.6mm 오른쪽으로 간 만큼 컨테이너의 mod_stock 기본 위치도 거울, K2 개머리판 3종 메시는 2·pivot_x(−30.6mm) 옮겨 상쇄(mirror_parts).
-카메라(+z 0.027)·장전 IK(dense)는 Codex 그대로. m_ValueArrayDelta(곡선별 시작·끝 값)도 같은 변환으로 맞춘다.
+모든 수정은 곡선 계수의 선형 변환(값×s+d) 또는 밀집 곡선 프레임 값 교체 — 스트림 곡선을 다시 인코딩하지 않는다
+(Codex v003b의 재인코딩 후보는 Unity EvaluateClip 네이티브 크래시).
+- 방아쇠: aim_camera 위치 +z LIFT(모델을 같은 양 올림, ak-v010).
+- 장전손잡이: 오른손이 mod_charge를 만지는 10개 클립 IK(K2AnimBakeCharge, 거리 기반 비중) + charge_2 왼손(Codex bake-ak-v003).
+- 오른쪽 접기: 회전 축 = K2 실제 경첩 핀(HINGE). mod_stock 위치 x → −x + a, y + b, z + c(모든 클립), 접기 클립 오일러 y·z 반전,
+  개머리판 메시 −HINGE(mirror_parts), 컨테이너 mod_stock 기본값도 같은 변환.
+- 접기 손: AK 왼손은 왼쪽으로 미는 동작이라 반대 — 접기 클립의 왼팔·손가락을 처음 자세로 고정.
+- 조정간: firemode 클립의 오른팔(쇄골~손바닥·마커)을 처음 자세로 고정 — 손가락만 움직임(AK 오른쪽 레버로 손이 가지 않게).
+- 탄창 칸: mod_magazine·mod_magazine_new +z LIFT(다른 탄창이 K2 탄창 구멍에), K2 전용 탄창 메시는 −LIFT.
+m_ValueArrayDelta(곡선별 시작·끝 값)도 같은 선형 변환으로 맞춘다.
 
   python tools/build_anim.py <K2 번들 폴더(ak-v010)> <출력 폴더>
-필요: Codex 작업 폴더(코덱스방/K2-anim-v001)의 ak_graph_v003a·ak_curve_fix_v003a·build_ak_anim_v002a 모듈과 bake-ak-v003/ik-curves.json(장전 IK 결과).
-0.9.0 조립: ak-v010(-k2SightDy 0.011118) + 이 출력 5개 파일 → ak-v011, bundles.json에 override 번들 항목과 컨테이너 의존 추가.
+필요: Codex 작업 폴더(코덱스방/K2-anim-v001)의 ak_graph_v003a·ak_curve_fix_v003a·build_ak_anim_v002a 모듈, bake-ak-v003/ik-curves.json,
+      BAKE_R(K2AnimBakeCharge 결과). 조립: ak-v010 + 출력 → ak-v013, bundles.json에 override 번들 항목·컨테이너 의존 추가.
 """
-import sys, pathlib, json, hashlib, copy
+import sys, pathlib, json, hashlib, copy, math
 CODEX = pathlib.Path('F:/코딩/Index/코덱스방/K2-anim-v001')
 sys.path.insert(0, str(CODEX))
 import ak_graph_v003a as G
@@ -21,6 +25,14 @@ from build_ak_anim_v002a import renamed
 
 SRC = pathlib.Path(sys.argv[1]); OUT = pathlib.Path(sys.argv[2])
 G.SOURCE = SRC
+# K2 개머리판 경첩 핀 축(슬롯 기준 x·y, m) — 앞부품 경첩 마디 원통 맞춤(3종 공통, 반지름 ~10mm, 잔차 <1mm). 무기 좌표로 중심 오른쪽 20.6mm
+HINGE = (0.0359, 0.0205)
+LIFT = 0.027   # K2 모델을 올린 양(-k2SightDy 0.011118 − (−0.015882)) — aim_camera·탄창 칸에 같이 더한다
+BAKE_R = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-charge-v001/ik-curves.json'
+SELECTOR = ('ak100_firemode_0', 'ak100_firemode_1')
+R_ARM = {'Base HumanRCollarbone', 'Base HumanRUpperarm', 'Base HumanRForearm1', 'Base HumanRForearm2', 'Base HumanRForearm3', 'Base HumanRPalm',
+         'weapon_R_IK_marker', 'weapon_R_hand_marker', 'Bend_Goal_Right'}
+L_ARM = {'Base HumanL*', 'weapon_L_IK_marker', 'weapon_L_hand_marker', 'Bend_Goal_Left'}
 FOLD = ('ak100_stock_folding_left', 'ak100_stock_folded_left', 'ak100_stock_unfolding_left')
 
 
@@ -38,13 +50,22 @@ def main():
     assert not OUT.exists(), '기존 결과 덮어쓰기 금지'
     g = Graph(); base, overrides, refs = g.animation_refs()
     bake = json.loads((CODEX / 'bake-ak-v003/ik-curves.json').read_text(encoding='utf-8')); assert bake['passed']
-    baked = {c['name']: c for c in bake['clips']}; changed = {}; changes = []
+    baked = {c['name']: c for c in bake['clips'] if c['side'] == 'L'}          # charge_2(왼손 당김)는 Codex 결과
+    mine = json.loads(pathlib.Path(BAKE_R).read_text(encoding='utf-8')); assert mine['passed']
+    baked.update({c['name']: c for c in mine['clips']})                         # 오른손이 손잡이 만지는 10개(K2AnimBakeCharge)
+    changed = {}; changes = []
     for data in baked.values():
         for sample in data['frames']:
             for field in ('upper', 'forearm', 'palm'): sample[field] = unity_to_clip(sample[field])
     folding = next(o.read_typetree() for o in refs.values() if o.read_typetree()['m_Name'] == 'ak100_stock_folding_left')
     pb = next(b for b in bindings(folding, g.paths) if b['path'].endswith('/mod_stock') and b['attribute'] == 1)
     pivot_x = eval_scalar(clipdata(folding), pb['offset'], 0)   # 펼친 상태 x — 거울면
+    rb = next(b for b in bindings(folding, g.paths) if b['path'].endswith('/mod_stock') and b['attribute'] == 4)
+    p0 = [eval_scalar(clipdata(folding), pb['offset'] + j, 0) for j in range(3)]
+    th = math.radians(eval_scalar(clipdata(folding), rb['offset'], 0))   # 펼친 상태 X 회전(−4.18°)
+    hw = (HINGE[0], HINGE[1] * math.cos(th), HINGE[1] * math.sin(th))     # 슬롯 기준 경첩 → 무기 좌표 변위
+    shift = (p0[0] + hw[0] + p0[0], hw[1], hw[2])                          # x: −p0x + a = p0x + hwx
+    print('경첩(무기 좌표)', [round(p0[j] + hw[j], 5) for j in range(3)], 'shift', [round(v, 5) for v in shift])
     for ident, o in refs.items():
         t = o.read_typetree(); bs = list(bindings(t, g.paths))
         aim = [b for b in bs if b['path'].endswith('/aim_camera') and b['attribute'] == 1]
@@ -68,16 +89,32 @@ def main():
                             value += 360 * round((de['m_SampleArray'][at] - value) / 360)
                         de['m_SampleArray'][at] = value
                 row['ik'].append(name + ':' + field)
-        # 오른쪽 접기: 총 중심선(x=0) 기준 거울 — mod_stock 위치 x 부호 반전(모든 클립), 접기 클립은 회전 오일러 y·z도 반전.
-        # 펼친 상태 축이 x −15.3mm → +15.3mm로 가므로 K2 개머리판 메시를 2·pivot_x만큼 옮겨 상쇄한다(아래 mirror_parts).
+        # 오른쪽 접기(0.9.1): 회전 축을 K2 실제 경첩 핀으로. mod_stock 위치 x → −x + a, y + b, z + c(모든 클립 — 펼친 상태에서 노드 = 경첩 핀),
+        # 접기 클립은 회전 오일러 y·z 반전(오른쪽으로 돎). 개머리판 메시는 −HINGE만큼 옮겨 펼친 모습 유지(mirror_parts).
         st = [b for b in bs if b['path'].endswith('/mod_stock')]
         assert {b['attribute'] for b in st} <= {1, 3, 4} and 1 in {b['attribute'] for b in st}, t['m_Name']
         for b in st:
-            if b['attribute'] == 1: lin(t, b['offset'], scale=-1); row['fold'].append('posX')
+            if b['attribute'] == 1:
+                for j in range(3): lin(t, b['offset'] + j, scale=-1 if j == 0 else 1, add=shift[j])
+                row['fold'].append('pos')
             elif b['attribute'] == 4 and t['m_Name'] in FOLD: lin(t, b['offset'] + 1, scale=-1); lin(t, b['offset'] + 2, scale=-1); row['fold'].append('rotYZ')
         if t['m_Name'] in FOLD:
             c = clipdata(t); end = max(t['m_MuscleClip']['m_StopTime'], 0)
             row['foldPosition'] = [[round(eval_scalar(c, pb2['offset'] + j, tm), 5) for j in range(3)] for pb2 in st if pb2['attribute'] == 1 for tm in (0, end)]
+        # 조정간(0.9.1): AK 손이 오른쪽 레버로 가는 대신 팔은 제자리, 손가락 움직임만(엄지로 K2 왼쪽 조정간을 돌리는 모양)
+        # 접기(0.9.1): AK 왼손은 왼쪽으로 미는 동작이라 오른쪽 접기와 반대 — 왼팔·손가락은 처음 자세(핸드가드)로 고정
+        for names in ([R_ARM] if t['m_Name'] in SELECTOR else []) + ([L_ARM] if t['m_Name'] in FOLD else []):
+            for b in bs:
+                last = b['path'].split('/')[-1]
+                if last in names or ('Base HumanL*' in names and last.startswith('Base HumanL')):
+                    c = clipdata(t)
+                    for j in range(b['dim']): lin(t, b['offset'] + j, scale=0, add=eval_scalar(c, b['offset'] + j, 0))
+                    row.setdefault('frozen', []).append(last)
+        # 탄창 칸(0.9.1): K2를 27mm 올린 만큼 mod_magazine·mod_magazine_new도 무기 +z 27mm(다른 탄창이 K2 탄창 구멍에 맞게).
+        # K2 전용 탄창 메시는 −27mm(mag_parts)로 지금 자리 유지.
+        for b in bs:
+            if b['attribute'] == 1 and b['path'].split('/')[-1] in ('mod_magazine', 'mod_magazine_new'):
+                lin(t, b['offset'] + 2, add=LIFT); row.setdefault('mag', []).append(b['path'].split('/')[-1])
         changed[ident] = t; changes.append(row)
     assert len(changed) == 98, len(changed)
 
@@ -141,10 +178,18 @@ def main():
         if o.type.name == 'Transform':
             tr = o.read_typetree()
             if gos.get(tr['m_GameObject']['m_PathID']) == 'mod_stock':
-                assert abs(tr['m_LocalPosition']['x'] - pivot_x) < 0.002, tr['m_LocalPosition']
-                tr['m_LocalPosition']['x'] = -tr['m_LocalPosition']['x']; o.save_typetree(tr); nstock += 1
+                lp = tr['m_LocalPosition']; assert abs(lp['x'] - pivot_x) < 0.002, lp
+                lp['x'] = -lp['x'] + shift[0]; lp['y'] += shift[1]; lp['z'] += shift[2]; o.save_typetree(tr); nstock += 1
     assert nstock >= 1
-    mirror_parts(SRC, OUT / 'bundles', 2 * pivot_x)
+    mirror_parts(SRC, OUT / 'bundles', (-HINGE[0], -HINGE[1]))
+    nmag = 0
+    for o in body.objects.values():
+        if o.type.name == 'Transform':
+            tr = o.read_typetree()
+            if gos.get(tr['m_GameObject']['m_PathID']) in ('mod_magazine', 'mod_magazine_new'):
+                tr['m_LocalPosition']['z'] += LIFT; o.save_typetree(tr); nmag += 1
+    assert nmag >= 2, nmag
+    shift_children(SRC, OUT / 'bundles', MAGS, (0, -LIFT, 0))   # 슬롯 회전 0(평소 자세) → 루트 기준 = X−90 × (0,0,−LIFT) = (0, −LIFT, 0)
     renamed(bodyenv, 'CAB-' + hashlib.sha256(b'K2-anim-v004-claude-container').hexdigest()[:32])
     dest = OUT / 'bundles' / BODY; dest.parent.mkdir(parents=True, exist_ok=True); dest.write_bytes(bodyenv.file.save(packer='lz4'))
     _, check = sf(UnityPy.load(str(dest)))
@@ -162,8 +207,24 @@ STOCKS = ['assets/content/items/mods/stocks/stock_daewoo_k2_std.bundle', 'assets
           'assets/content/items/mods/stocks/stock_daewoo_k2_light.bundle']
 
 
-def mirror_parts(src, dst, dx):
-    """K2 개머리판 3종: 루트 바로 아래 노드(LOD 메시)를 무기 x로 dx 이동 — 슬롯·루트 회전은 x축 회전뿐이라 로컬 x = 무기 x."""
+MAGS = ['assets/content/items/mods/magazines/mag_stanag_daewoo_k2_std_556x45_30.bundle']
+
+
+def shift_children(src, dst, keys, d):
+    """부품 루트 바로 아래 노드 전부(LOD 메시·총알 노드)를 루트 기준 d만큼 이동."""
+    for key in keys:
+        env = UnityPy.load(str(src / key)); _, f = sf(env)
+        ts = {o.path_id: o for o in f.objects.values() if o.type.name == 'Transform'}
+        root = next(i for i, o in ts.items() if o.read_typetree()['m_Father']['m_PathID'] == 0)
+        for ch in ts[root].read_typetree()['m_Children']:
+            o = ts[ch['m_PathID']]; tr = o.read_typetree()
+            for k, v in zip('xyz', d): tr['m_LocalPosition'][k] += v
+            o.save_typetree(tr)
+        out = dst / key; out.parent.mkdir(parents=True, exist_ok=True); out.write_bytes(env.file.save(packer='lz4'))
+
+
+def mirror_parts(src, dst, d):
+    """K2 개머리판 3종: 루트 바로 아래 노드(LOD 메시)를 슬롯 기준 (dx, dy)만큼 이동. 루트 = 슬롯 × X+90이라 루트 기준 = X−90 × 슬롯 기준 = (dx, 0, −dy)."""
     for key in STOCKS:
         env = UnityPy.load(str(src / key)); _, f = sf(env)
         ts = {o.path_id: o for o in f.objects.values() if o.type.name == 'Transform'}
@@ -172,7 +233,7 @@ def mirror_parts(src, dst, dx):
         for ch in rt['m_Children']:
             o = ts[ch['m_PathID']]; tr = o.read_typetree(); q = tr['m_LocalRotation']
             assert abs(q['y']) < 1e-4 and abs(q['z']) < 1e-4, q   # x축 회전만
-            tr['m_LocalPosition']['x'] += dx; o.save_typetree(tr)
+            tr['m_LocalPosition']['x'] += d[0]; tr['m_LocalPosition']['z'] -= d[1]; o.save_typetree(tr)
         out = dst / key; out.parent.mkdir(parents=True, exist_ok=True); out.write_bytes(env.file.save(packer='lz4'))
 
 
