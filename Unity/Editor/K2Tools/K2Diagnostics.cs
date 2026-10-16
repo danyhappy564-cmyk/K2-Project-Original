@@ -20,7 +20,7 @@ namespace K2Tools {
    try {
     var fbx=PrepareSource();
     var parts=fbx.GetComponentsInChildren<MeshFilter>(true).ToDictionary(m=>m.name.Replace("daewoo_K2_",""),m=>m);
-    var root=AssetDatabase.LoadAssetAtPath<GameObject>(DONOR+DONOR_MODEL).transform;
+    var root=AssetDatabase.LoadAssetAtPath<GameObject>(DonorModelPath).transform;
     var weapon=root.Find("Weapon_root/Weapon_root_anim/weapon");
     Vector3 Pos(Transform t)=>root.InverseTransformPoint(t.position);
     var off=Anchors.Select(a=>Pos(weapon.Find(a.m4))-parts[a.k2].transform.localPosition).Aggregate(Vector3.zero,(a,b)=>a+b)/Anchors.Length;

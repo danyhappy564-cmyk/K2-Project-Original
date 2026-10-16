@@ -11,7 +11,7 @@
 
 좌표: 무기(weapon) 노드 기준 -y가 앞, +z가 위. 슬롯 회전은 단위, 부품 루트는 슬롯 회전 × X축 +90°로 붙는다.
 
-  python tools/fix_part_nodes.py <K2 번들 폴더(assets/ 위)> <출력 폴더> <게임 StreamingAssets/Windows(읽기 전용)> [--inplace]
+  python tools/fix_part_nodes.py <K2 번들 폴더(assets/ 위)> <출력 폴더> <게임 StreamingAssets/Windows(읽기 전용)> [--inplace] [--donor-handguard <번들>]
   --inplace: 출력 폴더 = 입력 폴더, 고친 번들을 제자리에 바꿔 쓴다(finish_bundles.py). 두 번 돌리면 총알이 두 번 옮겨지므로
   part-nodes.json이 이미 있으면 멈춘다.
 """
@@ -20,6 +20,8 @@ import UnityPy
 
 src_root, dst_root, game = sys.argv[1], sys.argv[2], sys.argv[3]
 INPLACE = "--inplace" in sys.argv[4:]
+# 0.7.0: 도너 손잡이(왼손 기준) — 기본 AK-101 기본 구성 AK-74M 손잡이, AK5C 도너면 WTT-Armory ak5c_handguard.bundle(전체 경로)
+DONOR_HG = sys.argv[sys.argv.index("--donor-handguard") + 1] if "--donor-handguard" in sys.argv else None
 if os.path.exists(os.path.join(dst_root, "part-nodes.json")): sys.exit(f"STOP: 이미 처리됨 — {dst_root}/part-nodes.json")
 C = "assets/content/"
 K2_CONTAINER = C + "weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle"
@@ -106,9 +108,10 @@ report = {}
 
 # ── 1) 왼손: AK-74M 손잡이의 손바닥 자세를 무기 좌표에서 같은 자리로 ──
 cont = Tree(os.path.join(src_root, K2_CONTAINER))
-model = next(pid for pid, n in cont.names.items() if n.endswith(".generated") and not n.endswith("_simple.generated"))
+model = next(pid for pid, t in cont.tt.items() if t["m_Father"]["m_PathID"] == 0 and not cont.names[pid].endswith("_simple.generated")
+             and any(cont.names[c["m_PathID"]] == "Weapon_root" for c in t["m_Children"]))   # 모델 루트(AK: *.generated, AK5C: weapon_ak5c_prefab)
 weapon = cont.find("weapon", under=model)
-upper, akhg = Tree(os.path.join(src_root, K2_UPPER)), Tree(os.path.join(game, AK_HANDGUARD))
+upper, akhg = Tree(os.path.join(src_root, K2_UPPER)), Tree(DONOR_HG or os.path.join(game, AK_HANDGUARD))
 up_root = next(pid for pid, t in upper.tt.items() if t["m_Father"]["m_PathID"] == 0)
 ak_root = next(pid for pid, t in akhg.tt.items() if t["m_Father"]["m_PathID"] == 0)
 

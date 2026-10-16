@@ -20,9 +20,11 @@ namespace K2Tools
         // 도너(애니메이션·사운드·손 위치의 원본 무기) — 0.3.0부터 SCAR-L(Mk16): 노리쇠에 붙은 측면 장전손잡이·AR식 탄창/멈치가 K2와 가깝다
         // 0.4.0: 도너 AK-101 — 오른쪽 장전손잡이가 노리쇠에 붙은 구조가 K2와 같다. 바닐라 컨테이너 번들을 직접 개조하므로
         // 여기서는 K2 메시를 AK 노드 기준으로 bake하고 부품 번들을 AK 슬롯 기준으로 만든다(K2Parts.BuildAll -k2Mode reskin).
-        const string DONOR = "Assets/K2Ripped/AK101/Content/Weapons/ak100/";
-        const string DONOR_NAME = "weapon_izhmash_ak101_556x45";
-        const string DONOR_MODEL = DONOR_NAME + ".generated.prefab";
+        // 0.7.0: 도너 AK5C(WTT-Armory, FN FNC 계열) — 오른쪽 접기·왼쪽 회전 조정간·오른쪽 장전손잡이·STANAG 곧은 삽입이 K2와 같다.
+        // -k2Donor ak5c로 고른다(기본 ak101). AK5C 계층은 ImportDonor(K2Donor.cs)가 WTT 번들에서 SDK 프리팹으로 옮겨 둔다.
+        static bool DonorAK5C => Arg("-k2Donor") == "ak5c";
+        static string DonorModelPath => DonorAK5C ? "Assets/K2Ripped/AK5C/weapon_ak5c_prefab.prefab"
+            : "Assets/K2Ripped/AK101/Content/Weapons/ak100/weapon_izhmash_ak101_556x45.generated.prefab";
         const string HIDE = "";   // Swaps에서 이 값이면 빈 메시로 숨긴다(K2에 없는 도너 부품)
         // 조준선 보정(m) — all-v007 조준 시점 렌더로 확정(가늠쇠 끝이 화면 중앙). -k2SightDy로 바꿔 시험 가능
         static float SightDy => float.TryParse(Arg("-k2SightDy"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0f;   // 0.4.0(AK): 조준 시점 렌더로 다시 정한다
@@ -35,18 +37,29 @@ namespace K2Tools
 
         // K2 부품(FBX 오브젝트 이름 뒤쪽) ↔ M4A1 weapon 아래 노드 — 정렬 기준점(하부 조작부 4개, 위·앞뒤 평균).
         // 탄창은 뺀다: K2 탄창 본 머리가 탄창 아래쪽이라 M4A1 mod_magazine(탄창 위쪽)과 116mm 어긋났다(body-v001).
-        static readonly (string k2, string m4)[] Anchors = { ("trigger", "weapon_trigger"), ("hammer", "weapon_hammer") };
+        static (string k2, string m4)[] Anchors => DonorAK5C ? new[] { ("trigger", "weapon_trigger") } : new[] { ("trigger", "weapon_trigger"), ("hammer", "weapon_hammer") };
         // 참고로만 오차를 기록하는 쌍
-        static readonly (string k2, string m4)[] InfoPairs = { ("magazine", "mod_magazine"), ("bolt_carrier", "weapon_bolt") };
-        // 도너(AK-101) 메시 노드(weapon 기준 경로) → K2 부품. "a+b"는 한 메시로 합친다, HIDE는 빈 메시.
-        // AK 조정간은 오른쪽 큰 레버로 돌아가는 동작이라 K2 조정간(왼쪽 작은 것)은 총몸에 고정으로 합친다.
-        static readonly (string node, string part)[] Swaps =
-        {
-            ("weapon_izhmash_ak101_556x45_LOD0", "lower+selector+bolt_release"), ("weapon_izhmash_ak74m_545x39_LOD1", "lower+selector+bolt_release"),
-            ("weapon_izhmash_ak74m_dovetail_LOD0", HIDE), ("weapon_izhmash_ak74m_kolodka_LOD0", HIDE), ("mod_stock_release", HIDE),
-            ("weapon_bolt", "bolt_carrier"), ("weapon_hammer", "hammer"), ("weapon_release", "mag_release_R+mag_release_L"),
-            ("weapon_selector", HIDE), ("weapon_trigger", "trigger"),
-        };
+        static (string k2, string m4)[] InfoPairs => DonorAK5C
+            ? new[] { ("magazine", "mod_magazine"), ("bolt_carrier", "weapon_bolt"), ("selector", "weapon_selector"), ("bolt_release", "weapon_bolt_catch") }
+            : new[] { ("magazine", "mod_magazine"), ("bolt_carrier", "weapon_bolt") };
+        // 도너 메시 노드(weapon 기준 경로) → K2 부품. "a+b"는 한 메시로 합친다, HIDE는 빈 메시.
+        // AK-101: AK 조정간은 오른쪽 큰 레버로 돌아가는 동작이라 K2 조정간(왼쪽 작은 것)은 총몸에 고정으로 합친다.
+        // AK5C: 조정간·노리쇠멈치가 왼쪽에서 M4 동작으로 돈다 — K2 조정간·노리쇠멈치를 그 노드에. 해머 노드가 없어 총몸에 합친다.
+        //       총몸(ak5c_frame)은 위·아래 리시버 일체라 K2 하부만(상부는 mod_reciever 부품), 덮개·가늠자·가늠쇠는 K2 부품에 있어 숨긴다.
+        static (string node, string part)[] Swaps => DonorAK5C
+            ? new[]
+            {
+                ("ak5c_frame", "lower+hammer"), ("ak5c_dustcover", HIDE), ("ak5c_fs", HIDE), ("ak5c_rs", HIDE),
+                ("weapon_bolt", "bolt_carrier"), ("weapon_selector", "selector"), ("weapon_trigger", "trigger"), ("weapon_bolt_catch", "bolt_release"),
+                ("weapon_release/ak5c_release", "mag_release_R+mag_release_L"), ("weapon_release/ak5c_release2", HIDE),
+            }
+            : new[]
+            {
+                ("weapon_izhmash_ak101_556x45_LOD0", "lower+selector+bolt_release"), ("weapon_izhmash_ak74m_545x39_LOD1", "lower+selector+bolt_release"),
+                ("weapon_izhmash_ak74m_dovetail_LOD0", HIDE), ("weapon_izhmash_ak74m_kolodka_LOD0", HIDE), ("mod_stock_release", HIDE),
+                ("weapon_bolt", "bolt_carrier"), ("weapon_hammer", "hammer"), ("weapon_release", "mag_release_R+mag_release_L"),
+                ("weapon_selector", HIDE), ("weapon_trigger", "trigger"),
+            };
         static readonly (string parent, string part)[] Extras = { };
         // 개조 매핑: 도너 메시 노드 GameObject 이름 → (bake 메시 이름, 재질 이름들) — tools/reskin_vanilla.py가 쓴다
         public static readonly Dictionary<string, (string mesh, string[] mats)> ReskinMap = new();
@@ -194,13 +207,16 @@ namespace K2Tools
                     var boltMesh = parts["bolt_carrier"].GetComponent<MeshFilter>().sharedMesh; var bv = boltMesh.vertices;
                     float cx = 0f;
                     var side = bv.Where(v => v.x - cx > 0.018f).Distinct().ToArray();
-                    var charge = weapon.Find("weapon_bolt/mod_charge");
+                    var charge = DonorAK5C ? null : weapon.Find("weapon_bolt/mod_charge");
                     if (side.Length > 0 && charge)
                     {
                         var h = side.Aggregate(Vector3.zero, (acc, v) => acc + v) / side.Length + parts["bolt_carrier"].localPosition + offset;
                         var r = RootPos(charge) - h;
                         L($"  참고   장전손잡이(K2 {(h.x > RootPos(weapon.Find("weapon_bolt")).x ? "오른쪽" : "왼쪽")}) ↔ AK mod_charge 차이 {r.magnitude * 1000:0.0} mm (x{r.x * 1000:0}, y{r.y * 1000:0}, z{r.z * 1000:0})");
                     }
+                    // 조준선: K2 가늠자 구멍 중심(FBX 좌표 0, 0.131557, -0.005787 — K2Diagnostics와 같은 값)이 조준 카메라 높이에 오려면
+                    var aimY = RootPos(weapon.Find("aim_camera")).y; var rearY = 0.131557f + offset.y;
+                    L($"  참고   조준 카메라 높이 - K2 가늠자 구멍 = {(aimY - rearY) * 1000:+0.0;-0.0} mm (0이면 조준선 일치, 지금 SightDy {SightDy * 1000:+0.0;-0.0} mm 포함)");
                     L($"정렬 이동량(K2→M4, m): {offset.x:0.0000} {offset.y:0.0000} {offset.z:0.0000}");
                     foreach (var (k2, m4) in Anchors.Concat(InfoPairs))
                     {

@@ -83,12 +83,12 @@ public sealed class K2Mod(CustomItemService customItems, TemplateTable templates
         handguardScope.Id = new MongoId(HandguardScopeSlotId);
         handguardScope.Parent = new MongoId(Handguard);
 
-        KeepSlots(Weapon, "mod_magazine", "mod_reciever", "mod_stock");      // 도너 AK-101 기준(0.4.0) — 가스블록·소염기·총열은 K2 상부 쪽, 권총손잡이·장전손잡이는 K2 메시에 포함
+        KeepSlots(Weapon, "mod_magazine", "mod_reciever", "mod_stock");      // M4A1 복제(0.7.0 도너 AK5C와 같은 원본) — 총열·핸드가드·소염기는 K2 상부 쪽, 권총손잡이·장전손잡이는 K2 메시에 포함
         KeepSlots(Upper, "mod_barrel", "mod_handguard");                     // 가늠자 일체형, 레일은 핸드가드 쪽
         KeepSlots(Barrel, "mod_muzzle");                                     // 가스블록·가늠쇠 일체형, 유탄발사기는 아직 없음
         KeepSlots(Handguard);                                                // M4 하부 핸드가드 칸 제거
         KeepSlots(HandguardClassic);                                         // 클래식 손잡이는 레일 없음 — 조준경 칸도 없음
-        KeepSlots(Stock); KeepSlots(StockAr); KeepSlots(StockLight);        // 셋 다 접힘: 도너 AK-101(Foldable, FoldedSlot mod_stock)의 왼쪽 접기 동작
+        KeepSlots(Stock); KeepSlots(StockAr); KeepSlots(StockLight);        // 셋 다 접힘: 무기 Foldable(01_weapon.json) + 도너 AK5C의 오른쪽 접기 동작(0.7.0)
         Item(Handguard).Properties!.Slots = [handguardScope, .. HandguardRailSlots.Select(r =>
         {
             var slot = json.Deserialize<Slot>(json.Serialize(FindSlot(MlokDonor, r.name))!)!;

@@ -80,7 +80,7 @@ namespace K2Tools
                 // 1. 본체 (슬롯 mod_reciever·mod_stock을 K2 위치로)
                 // 0.4.0 개조 모드: 컨테이너는 바닐라 번들을 직접 개조(tools/reskin_vanilla.py)하므로 여기선 본체 모델(bake·확인용)만 만든다
                 ReskinMap.Clear();
-                var modelPath = Copy(DONOR + DONOR_MODEL, OUT + NAME + "_model.generated.prefab");
+                var modelPath = Copy(DonorModelPath, OUT + NAME + "_model.generated.prefab");
                 Vector3 off = Vector3.zero;
                 EditModel(modelPath, NAME + "_model.generated", parts, mats, ref off, true);
                 AssetDatabase.SaveAssets();

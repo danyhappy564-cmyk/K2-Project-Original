@@ -1,4 +1,4 @@
-"""Copy AK-101 bundle; preserve serialized gameplay/sound data; replace only visual references and fireport."""
+"""Copy donor (AK-101 vanilla, or AK5C from WTT-Armory since 0.7.0) container bundle; preserve serialized gameplay/sound data; replace only visual references and fireport."""
 import copy,hashlib,json,pathlib,sys,UnityPy
 from verify_reskin import verify,serialized,KEY
 
@@ -35,7 +35,7 @@ def patch(donor,root,mapfile,out):
    t['m_LocalPosition']=dict(zip('xyz',mapping['transforms']['fireport']));o.save_typetree(t);counts['fireport']+=1
   elif typ=='AudioClip':
    t=o.read_typetree();t['m_Resource']['m_Source']=t['m_Resource']['m_Source'].replace(oldcab,newcab);o.save_typetree(t);counts[typ]+=1
- assert counts['MeshFilter']==20 and counts['MeshRenderer']==20 and counts['fireport']==2,counts
+ assert counts['MeshFilter']==counts['MeshRenderer']>0 and counts['fireport']>=1,counts   # AK-101 20/20/2, AK5C 10/10/1
  for o in sf.objects.values():
   if o.type.name!='AssetBundle':continue
   t=o.read_typetree();t['m_Name']=KEY;t['m_AssetBundleName']=KEY
@@ -44,6 +44,7 @@ def patch(donor,root,mapfile,out):
    pre=oldpre[c['preloadIndex']:c['preloadIndex']+c['preloadSize']]+ptrs
    c['preloadIndex']=len(newpre);c['preloadSize']=len(pre);newpre.extend(pre)
    name=name.replace('/ak100/','/daewoo_k2/').replace('weapon_izhmash_ak101_556x45','weapon_daewoo_k2_556x45')
+   if 'daewoo_k2' not in name and name.lower().endswith('_container.prefab'):name='assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.prefab'   # AK5C 등 다른 도너
    containers.append((name.lower(),c))
   t['m_PreloadTable']=newpre;t['m_Container']=containers
   t['m_Dependencies']+= [meshcab.lower(),matcab.lower()];o.save_typetree(t)
@@ -51,7 +52,7 @@ def patch(donor,root,mapfile,out):
  sf.name=newcab
  out.parent.mkdir(parents=True,exist_ok=True)
  out.write_bytes(env.file.save(packer='lz4'))
- report=verify(out,root,mapping)
+ report=verify(out,root,mapping,donor)
  (root/'reskin-validation.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
  print(json.dumps(report))
 if __name__=='__main__':patch(*sys.argv[1:5])
