@@ -1,5 +1,5 @@
 import pathlib,json,UnityPy,sys
-base=pathlib.Path(__file__).resolve().parent.parent;root=base/'Bundles/ak-v004-final';game=pathlib.Path('E:/SPT 4.1/EscapeFromTarkov_Data/StreamingAssets/Windows')
+base=pathlib.Path(__file__).resolve().parent.parent;root=pathlib.Path(sys.argv[1]) if len(sys.argv)>1 else base/'Bundles/ak-v004-final';game=pathlib.Path('E:/SPT 4.1/EscapeFromTarkov_Data/StreamingAssets/Windows')
 ours={a['key']:a['dependencyKeys'] for a in json.loads((root/'bundles.json').read_text())['manifest']};win=json.loads((game/'Windows.json').read_text(encoding='utf-8-sig'))
 seen=set();order=[]
 def visit(k):
@@ -35,6 +35,6 @@ for k in ours:
     target=sf if p['m_FileID']==0 else loaded.get(sf.externals[p['m_FileID']-1].path.split('/')[-1].lower())
     if target is None or p['m_PathID'] not in target.objects:missing.append([k,o.path_id,p])
 report={'passed':not missing,'customBundles':len(ours),'loadedBundles':len(order),'checkedPointers':count,'missing':missing}
-(root/'reference-audit.json').write_text(json.dumps(report,indent=2),encoding='utf-8');(base/'diagnostics/load-order.txt').write_text('\n'.join(paths),encoding='utf-8')
+(root/'reference-audit.json').write_text(json.dumps(report,indent=2),encoding='utf-8');(root/'load-order.txt').write_text('\n'.join(paths),encoding='utf-8')
 print(json.dumps(report));sys.exit(bool(missing))
 
