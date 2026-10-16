@@ -13,7 +13,8 @@
     },
     "Weight": 0.96,
     "ExaminedByDefault": true,
-    "CanSellOnRagfair": false
+    "CanSellOnRagfair": false,
+    "ExtraSizeLeft": 1
   },
   "locales": {
     "en": {

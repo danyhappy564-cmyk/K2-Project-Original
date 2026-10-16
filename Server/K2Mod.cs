@@ -34,6 +34,13 @@ public sealed class K2Mod(CustomItemService customItems, TemplateTable templates
     public const string StockLight = "d22000000000000000000019";
     const string PresetId = "d22000000000000000000002";
     const string HandguardScopeSlotId = "d22000000000000000000101";
+    // 0.6.0 MITS 핸드가드 손잡이·M-LOK 레일 칸 — 바닐라 Geissele SMR Mk16 13.5" 슬롯 정의(필터)를 복사, 노드는 K2Parts.cs가 만든다
+    const string MlokDonor = "5ea16ada09aa976f2e7a51be";
+    static readonly (string name, string id)[] HandguardRailSlots =
+    [
+        ("mod_foregrip", "d22000000000000000000102"), ("mod_mount_000", "d22000000000000000000103"), ("mod_mount_001", "d22000000000000000000104"),
+        ("mod_mount_002", "d22000000000000000000105"), ("mod_tactical_000", "d22000000000000000000106"),
+    ];
     const string Peacekeeper = "5935c25fb3acc3127c3d8cd9";
     const string DefaultInventory = "55d7217a4bdc2d86028b456d";
     const string M4A1 = "5447a9cd4bdc2dbd208b4567";
@@ -82,7 +89,12 @@ public sealed class K2Mod(CustomItemService customItems, TemplateTable templates
         KeepSlots(Handguard);                                                // M4 하부 핸드가드 칸 제거
         KeepSlots(HandguardClassic);                                         // 클래식 손잡이는 레일 없음 — 조준경 칸도 없음
         KeepSlots(Stock); KeepSlots(StockAr); KeepSlots(StockLight);        // 셋 다 접힘: 도너 AK-101(Foldable, FoldedSlot mod_stock)의 왼쪽 접기 동작
-        Item(Handguard).Properties!.Slots = [handguardScope];
+        Item(Handguard).Properties!.Slots = [handguardScope, .. HandguardRailSlots.Select(r =>
+        {
+            var slot = json.Deserialize<Slot>(json.Serialize(FindSlot(MlokDonor, r.name))!)!;
+            slot.Id = new MongoId(r.id); slot.Parent = new MongoId(Handguard);
+            return slot;
+        })];
 
         AllowOnly(Weapon, "mod_reciever", Upper);
         AllowOnly(Weapon, "mod_stock", Stock);

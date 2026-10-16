@@ -146,14 +146,26 @@ namespace K2Tools
                             {
                                 // 왼손 그립 자세(Base HumanLPalm)는 템플릿 그대로 — 핸드가드 루트가 바닐라 슬롯에 붙으므로 M4A1과 같은 손 위치
                                 var sub = r.Cast<Transform>().FirstOrDefault(t => t.name == "mod_handguard"); if (sub) UnityEngine.Object.DestroyImmediate(sub.gameObject);
-                                // 레일 윗면에 조준경 슬롯 — 앞뒤 위치는 M4A1 조준경 슬롯(상부 위)과 같게, 레일 범위 안으로
                                 var b = BodyBounds("handguard_long");
-                                var scope = new GameObject("mod_scope").transform;
-                                scope.SetParent(r, false); scope.localRotation = Quaternion.Euler(270, 0, 0);   // 바닐라 슬롯과 같은 방향(상부 LOD0 X 270 아래 회전 0)
-                                float z = Mathf.Clamp(m4ScopeSlot.GetColumn(3).z, b.min.z + 0.03f, b.max.z - 0.03f);
-                                // 높이는 레일 윗면 그대로(all-v001에서 M4A1 레일 대비 계산은 -64mm로 총 안쪽에 들어가 폐기 — 참고 로그만 남김)
-                                Put(scope, new Vector3(boreX, b.max.y, z));
-                                L($"  handguard: mod_scope 본체 공간 ({boreX:0.000},{b.max.y:0.000},{z:0.000}) = 레일 윗면, 총열 축 y {boreY:0.000} → 레일 높이 {(b.max.y - boreY) * 1000:0} mm");
+                                float tubeRear = BodyBounds("upper").max.z;   // 상부 리시버 앞끝 = 핸드가드 관 뒤끝(레일은 리시버 위까지 이어짐)
+                                // 레일 윗면 슬롯. 회전: 바닐라 M-LOK 핸드가드(Geissele SMR Mk16)와 같게 윗면 X 270, 옆·아래는 루트 앞축(Z) 기준으로 굴림
+                                // (왼쪽 +90 = mod_mount_000, 오른쪽 -90 = mod_mount_001, 아래 180 = mod_foregrip·mod_mount_002)
+                                void Slot(string name, float roll, Vector3 bodyPos)
+                                {
+                                    var s = new GameObject(name).transform;
+                                    s.SetParent(r, false); s.localRotation = Quaternion.AngleAxis(roll, Vector3.forward) * Quaternion.Euler(270, 0, 0);
+                                    Put(s, bodyPos);
+                                    L($"  handguard: {name} 본체 공간 {bodyPos.ToString("F3")} 굴림 {roll}");
+                                }
+                                // 조준경 마운트: 0.4.2 인게임 "너무 뒤" — M4A1 기준(리시버 위)에서 리시버 앞끝 16mm 뒤로(사용자 표시 위치)
+                                Slot("mod_scope", 0, new Vector3(boreX, b.max.y, Mathf.Clamp(tubeRear - 0.016f, b.min.z + 0.03f, b.max.z - 0.03f)));
+                                // 0.6.0: 손잡이·레일(M-LOK) — 손잡이는 관 뒤끝 9cm 앞 아래, 옆 레일은 앞에서 10cm, 아래 레일·윗면 전술 장비는 앞쪽
+                                Slot("mod_foregrip", 180, new Vector3(boreX, b.min.y, tubeRear + 0.09f));
+                                Slot("mod_mount_000", 90, new Vector3(b.min.x, boreY, b.max.z - 0.10f));
+                                Slot("mod_mount_001", -90, new Vector3(b.max.x, boreY, b.max.z - 0.10f));
+                                Slot("mod_mount_002", 180, new Vector3(boreX, b.min.y, b.max.z - 0.06f));
+                                Slot("mod_tactical_000", 0, new Vector3(boreX, b.max.y, b.max.z - 0.04f));
+                                L($"  handguard: 레일 높이 {(b.max.y - boreY) * 1000:0} mm, 관 {tubeRear:0.000}..{b.max.z:0.000}");
                                 break;
                             }
                             case "muzzle":
