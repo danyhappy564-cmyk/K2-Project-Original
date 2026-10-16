@@ -7,6 +7,11 @@
   "handbookPriceRoubles": 45000,
   "fleaPriceRoubles": 45000,
   "overrideProperties": {
+    "Prefab": {
+      "path": "assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle",
+      "rcid": ""
+    },
+    "Weight": 1,
     "ExaminedByDefault": true,
     "CanSellOnRagfair": false,
     "bFirerate": 750

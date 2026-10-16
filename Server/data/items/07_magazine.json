@@ -7,6 +7,11 @@
   "handbookPriceRoubles": 2200,
   "fleaPriceRoubles": 2200,
   "overrideProperties": {
+    "Prefab": {
+      "path": "assets/content/items/mods/magazines/mag_stanag_daewoo_k2_std_556x45_30.bundle",
+      "rcid": ""
+    },
+    "Weight": 0.12,
     "ExaminedByDefault": true,
     "CanSellOnRagfair": false
   },

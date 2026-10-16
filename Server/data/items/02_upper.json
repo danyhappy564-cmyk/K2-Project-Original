@@ -7,6 +7,11 @@
   "handbookPriceRoubles": 9000,
   "fleaPriceRoubles": 9000,
   "overrideProperties": {
+    "Prefab": {
+      "path": "assets/content/items/mods/recievers/reciever_daewoo_k2_std.bundle",
+      "rcid": ""
+    },
+    "Weight": 0.55,
     "ExaminedByDefault": true,
     "CanSellOnRagfair": false
   },

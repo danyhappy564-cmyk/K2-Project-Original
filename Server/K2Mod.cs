@@ -10,12 +10,13 @@ using SPTarkov.Server.Core.Models.Spt.Tables;
 using SPTarkov.Server.Core.Services.Modding.Custom;
 using SPTarkov.Server.Core.Utils;
 using Path = System.IO.Path;
+using File = System.IO.File;
 
 namespace K2Original;
 
 /// <summary>
 /// K2 소총과 전용 부품 6종을 등록한다(외형은 이 모드의 bundles.json 번들).
-/// 순서: 아이템 복제 → 프리팹 경로를 K2 번들로 → 슬롯 정리·필터 → 기본 프리셋 → 피스키퍼 판매.
+/// 순서: 아이템 복제(외형·무게 포함, data/items) → 외형 경로 검사 → 슬롯 정리·필터 → 기본 프리셋 → 피스키퍼 판매.
 /// </summary>
 [Injectable(InjectionType.Singleton, TypePriority = OnLoadOrder.Preload + 2)]
 public sealed class K2Mod(CustomItemService customItems, TemplateTable templates, GlobalTable globals,
@@ -32,18 +33,6 @@ public sealed class K2Mod(CustomItemService customItems, TemplateTable templates
     const string HandguardScopeSlotId = "d22000000000000000000101";
     const string Peacekeeper = "5935c25fb3acc3127c3d8cd9";
     const string DefaultInventory = "55d7217a4bdc2d86028b456d";
-
-    // 아이템 → 번들 키(Unity 빌더 K2Parts.cs의 번들 이름과 같아야 한다)
-    static readonly Dictionary<string, string> Prefabs = new()
-    {
-        [Weapon] = "assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle",
-        [Upper] = "assets/content/items/mods/recievers/reciever_daewoo_k2_std.bundle",
-        [Barrel] = "assets/content/items/mods/barrels/barrel_daewoo_k2_465mm.bundle",
-        [Handguard] = "assets/content/items/mods/handguards/handguard_daewoo_k2_mits_long.bundle",
-        [Muzzle] = "assets/content/items/mods/muzzle/muzzle_daewoo_k2_std_556x45.bundle",
-        [Stock] = "assets/content/items/mods/stocks/stock_daewoo_k2_std.bundle",
-        [Magazine] = "assets/content/items/mods/magazines/mag_stanag_daewoo_k2_std_556x45_30.bundle",
-    };
 
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
@@ -67,8 +56,14 @@ public sealed class K2Mod(CustomItemService customItems, TemplateTable templates
                 throw new InvalidOperationException($"[K2] 등록 실패 {def.NewId}: {string.Join("; ", result.Errors)}");
         }
 
-        // 2. 외형 = K2 번들
-        foreach (var (id, path) in Prefabs) Item(id).Properties!.Prefab!.Path = path;
+        // 2. 외형 확인 — Prefab 경로는 data/items/*.json의 overrideProperties에 적는다(WTT 방식). 여기서는 bundles.json에 있는지만 검사
+        var bundleKeys = File.ReadAllText(Path.Combine(folder, "bundles.json"));
+        foreach (var id in new[] { Weapon, Upper, Barrel, Handguard, Muzzle, Stock, Magazine })
+        {
+            var path = Item(id).Properties?.Prefab?.Path;
+            if (string.IsNullOrEmpty(path) || !bundleKeys.Contains($"\"{path}\""))
+                throw new InvalidDataException($"[K2] 외형 번들 경로가 bundles.json에 없음: {id} → {path}");
+        }
 
         // 3. 슬롯 — 프리팹에 실제로 있는 노드와 맞춘다(K2Parts.cs 참고)
         // 핸드가드 조준경 슬롯은 상부(M4 원본)의 mod_scope 정의를 복사해 만든다 — 상부에서 지우기 전에 복사

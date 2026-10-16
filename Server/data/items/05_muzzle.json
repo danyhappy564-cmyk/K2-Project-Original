@@ -7,6 +7,11 @@
   "handbookPriceRoubles": 1500,
   "fleaPriceRoubles": 1500,
   "overrideProperties": {
+    "Prefab": {
+      "path": "assets/content/items/mods/muzzle/muzzle_daewoo_k2_std_556x45.bundle",
+      "rcid": ""
+    },
+    "Weight": 0.05,
     "ExaminedByDefault": true,
     "CanSellOnRagfair": false
   },

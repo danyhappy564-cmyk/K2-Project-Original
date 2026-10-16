@@ -12,7 +12,24 @@
       "dependencyKeys": [
         "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
         "shaders",
-        "cubemaps"
+        "cubemaps",
+        "assets/content/weapons/m4a1/weapon_colt_m4a1_556x45_container.bundle",
+        "assets/systems/effects/smoke.bundle",
+        "assets/systems/effects/muzzleflash/muzzleflash.bundle",
+        "assets/systems/effects/heathaze/defaultheathaze.bundle",
+        "assets/content/weapons/wip/kibas tuning prefabs/muzzlejets_templates/default_assets.bundle",
+        "assets/content/weapons/weapon_root_anim_fix.bundle",
+        "assets/content/weapons/m4a1/textures/client_assets.bundle",
+        "assets/content/weapons/m4a1/client_assets.bundle",
+        "assets/content/weapons/animations/spirit_animations.bundle",
+        "assets/content/weapons/animations/simple_animations.bundle",
+        "assets/content/weapons/additional_hands/client_assets.bundle",
+        "assets/content/audio/weapons/m4a1.bundle",
+        "assets/content/audio/weapons/generic",
+        "assets/content/audio/weapons/ak74.bundle",
+        "assets/content/audio/blendoptions/assets.bundle",
+        "assets/content/audio/banks/m4a1.bundle",
+        "assets/commonassets/physics/physicsmaterials.bundle"
       ]
     },
     {
@@ -20,7 +37,9 @@
       "dependencyKeys": [
         "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
         "shaders",
-        "cubemaps"
+        "cubemaps",
+        "assets/content/items/mods/recievers/reciever_ar15_colt_m4a1_std.bundle",
+        "assets/commonassets/physics/physicsmaterials.bundle"
       ]
     },
     {
@@ -28,7 +47,11 @@
       "dependencyKeys": [
         "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
         "shaders",
-        "cubemaps"
+        "cubemaps",
+        "assets/content/items/mods/barrels/barrel_ar15_370mm.bundle",
+        "assets/systems/effects/smoke.bundle",
+        "assets/content/items/mods/barrels/barrel_ar15_370mm_textures.bundle",
+        "assets/commonassets/physics/physicsmaterials.bundle"
       ]
     },
     {
@@ -36,7 +59,10 @@
       "dependencyKeys": [
         "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
         "shaders",
-        "cubemaps"
+        "cubemaps",
+        "assets/content/items/mods/handguards/handguard_ar15_colt_m4_length_std.bundle",
+        "assets/content/items/mods/handguards/handguard_ar15_kac_ris_textures.bundle",
+        "assets/commonassets/physics/physicsmaterials.bundle"
       ]
     },
     {
@@ -44,7 +70,10 @@
       "dependencyKeys": [
         "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
         "shaders",
-        "cubemaps"
+        "cubemaps",
+        "assets/content/items/mods/muzzle/muzzle_ar15_colt_usgi_a2_556x45.bundle",
+        "assets/systems/effects/smoke.bundle",
+        "assets/commonassets/physics/physicsmaterials.bundle"
       ]
     },
     {
@@ -52,7 +81,10 @@
       "dependencyKeys": [
         "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
         "shaders",
-        "cubemaps"
+        "cubemaps",
+        "assets/content/items/mods/stocks/stock_ar15_colt_stock_tube_std.bundle",
+        "assets/content/items/mods/stocks/stock_ar15_high_standart_m4ss_lod0_textures.bundle",
+        "assets/commonassets/physics/physicsmaterials.bundle"
       ]
     },
     {
@@ -60,7 +92,9 @@
       "dependencyKeys": [
         "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
         "shaders",
-        "cubemaps"
+        "cubemaps",
+        "assets/content/items/mods/magazines/mag_stanag_colt_ar15_std_556x45_30.bundle",
+        "assets/commonassets/physics/physicsmaterials.bundle"
       ]
     }
   ]
