@@ -83,12 +83,12 @@ public sealed class K2Mod(CustomItemService customItems, TemplateTable templates
         handguardScope.Id = new MongoId(HandguardScopeSlotId);
         handguardScope.Parent = new MongoId(Handguard);
 
-        KeepSlots(Weapon, "mod_magazine", "mod_reciever", "mod_stock");      // M4A1 복제(0.7.0 도너 AK5C와 같은 원본) — 총열·핸드가드·소염기는 K2 상부 쪽, 권총손잡이·장전손잡이는 K2 메시에 포함
+        KeepSlots(Weapon, "mod_magazine", "mod_reciever", "mod_stock");      // SCAR Mk16 복제(0.8.0 도너) — 총열·핸드가드·소염기는 K2 상부 쪽, 권총손잡이·장전손잡이(mod_charge 필수 칸)는 K2 메시에 포함
         KeepSlots(Upper, "mod_barrel", "mod_handguard");                     // 가늠자 일체형, 레일은 핸드가드 쪽
         KeepSlots(Barrel, "mod_muzzle");                                     // 가스블록·가늠쇠 일체형, 유탄발사기는 아직 없음
         KeepSlots(Handguard);                                                // M4 하부 핸드가드 칸 제거
         KeepSlots(HandguardClassic);                                         // 클래식 손잡이는 레일 없음 — 조준경 칸도 없음
-        KeepSlots(Stock); KeepSlots(StockAr); KeepSlots(StockLight);        // 셋 다 접힘: 무기 Foldable(01_weapon.json) + 도너 AK5C의 오른쪽 접기 동작(0.7.0)
+        KeepSlots(Stock); KeepSlots(StockAr); KeepSlots(StockLight);        // 셋 다 접힘: SCAR 접기 클립이 개머리판 안 mod_stock_axis를 오른쪽으로 돌린다(K2Parts가 SCAR 개머리판과 같은 구조로 만든다, 0.8.0)
         Item(Handguard).Properties!.Slots = [handguardScope, .. HandguardRailSlots.Select(r =>
         {
             var slot = json.Deserialize<Slot>(json.Serialize(FindSlot(MlokDonor, r.name))!)!;

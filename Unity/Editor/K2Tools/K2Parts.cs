@@ -19,6 +19,7 @@ namespace K2Tools
     {
         const string M4P = "Assets/K2Ripped/M4Parts/Content/Items/Mods/";
         const string MODS = "Assets/Content/Items/Mods/";
+        const string SCAR_STOCK = "stock_mk16_fn_scar_folding_stock";
         const string SHARED_BUNDLE = "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle";
         const string BODY_MESH_BUNDLE = "assets/content/weapons/daewoo_k2/daewoo_k2_body_meshes.bundle";
         const string PLACEHOLDER_SHADERS = "shaders";
@@ -28,7 +29,10 @@ namespace K2Tools
         {
             public string Id, Template, Folder, Name, Mesh, Parent, Slot;
             public bool Alt;   // 같은 슬롯의 교체 부품(조립 미리보기에는 기본 부품만)
-            public string PrefabPath => MODS + Folder + "/" + Name + ".prefab";
+            // SCAR 도너(0.8.0) 개머리판: SCAR 접기 클립이 "mod_stock/stock_mk16_fn_scar_folding_stock/mod_stock_axis"를 이름으로 돌린다 —
+            // 프리팹 루트 이름(= 파일 이름)을 같게 하고 부품마다 폴더를 나눈다
+            public bool ScarFold => DonorSCAR && Folder == "stocks";
+            public string PrefabPath => ScarFold ? MODS + Folder + "/" + Name + "/" + SCAR_STOCK + ".prefab" : MODS + Folder + "/" + Name + ".prefab";
             public string Bundle => ("assets/content/items/mods/" + Folder + "/" + Name + ".bundle").ToLowerInvariant();
             public Matrix4x4 S;   // 부모 슬롯(= 이 부품 루트)의 본체 공간 행렬
         }
@@ -110,11 +114,14 @@ namespace K2Tools
                 {
                     // 게임 부착 규칙: 부품 루트 = 슬롯 × X축 +90° (바닐라 M4를 세 규칙으로 조립해 확인 — K2Check.AttachRuleTest, all-v003)
                     d.S = slotMatrix[d.Parent + "/" + d.Slot] * AttachRot;
+                    // SCAR 개머리판: 루트 자체 회전이 X -90(바닐라 SCAR 개머리판과 같게) → 부착 규칙 X +90과 상쇄돼 루트 = 슬롯.
+                    // 접기 클립도 루트를 위치 0·회전 0으로 둔다(펼침·접힘·메뉴 화면이 같은 기준)
+                    if (d.ScarFold) d.S = slotMatrix[d.Parent + "/" + d.Slot];
                     var path = Copy(M4P + d.Template + ".prefab", d.PrefabPath);
                     var root = PrefabUtility.LoadPrefabContents(path);
                     try
                     {
-                        root.name = d.Name;
+                        root.name = d.ScarFold ? SCAR_STOCK : d.Name;
                         var r = root.transform; var Sinv = d.S.inverse;
                         // 노드 위치만 본체 공간 목표로 옮기고 회전은 템플릿 그대로(게임 규칙이 템플릿 회전을 전제로 한다)
                         void Put(Transform t, Vector3 bodyPos)
@@ -122,7 +129,19 @@ namespace K2Tools
                             var parentM = d.S * (r.worldToLocalMatrix * t.parent.localToWorldMatrix);
                             t.localPosition = parentM.inverse.MultiplyPoint3x4(bodyPos);
                         }
+                        if (d.ScarFold)
+                        {
+                            // 접기 축: 바닐라 SCAR 개머리판 mod_stock_axis와 같은 자리·회전(펼침 클립 값 x 5°) — 이 아래 메시가 접기 때 오른쪽으로 182° 돈다
+                            r.localRotation = Quaternion.Euler(-90, 0, 0);
+                            var axis = new GameObject("mod_stock_axis").transform;
+                            axis.SetParent(r, false); axis.localPosition = new Vector3(0.0228f, 0.009f, 0.0001f); axis.localRotation = Quaternion.Euler(5, 0, 0);
+                            foreach (var c in r.Cast<Transform>().Where(t => t != axis).ToArray()) c.SetParent(axis, false);
+                        }
                         ReplaceMeshes(r, d, parts, mats, BodyPos(d.Mesh));
+                        // SCAR 도너(0.8.0): 바닐라 SCAR 부품엔 왼손 기준 노드(Base HumanLPalm)가 없고 왼손은 애니메이션 자세 그대로 —
+                        // K2 핸드가드에 템플릿(M4) 손바닥이 남아 있으면 그쪽으로 끌려가므로 지운다(손잡이를 달면 손잡이의 손바닥을 따름)
+                        if (DonorSCAR && d.Folder == "handguards")
+                            foreach (var palm in r.Cast<Transform>().Where(t => t.name.StartsWith("Base HumanLPalm")).ToArray()) UnityEngine.Object.DestroyImmediate(palm.gameObject);
 
                         switch (d.Id)
                         {
@@ -190,7 +209,7 @@ namespace K2Tools
                             case "stock":
                             case "stock_ar":
                             case "stock_light":
-                                foreach (var t in r.Cast<Transform>().Where(t => t.name.StartsWith("mod_stock")).ToArray()) UnityEngine.Object.DestroyImmediate(t.gameObject);
+                                foreach (var t in r.GetComponentsInChildren<Transform>(true).Where(t => t.name.StartsWith("mod_stock") && t.name != "mod_stock_axis").ToArray()) UnityEngine.Object.DestroyImmediate(t.gameObject);
                                 break;
                         }
                         PrefabUtility.SaveAsPrefabAsset(root, path);
@@ -334,7 +353,7 @@ namespace K2Tools
                 var parent = placed[d.Parent];
                 var slot = FindDeep(parent, d.Slot);
                 var go = (GameObject)UnityEngine.Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(d.PrefabPath), slot, false);
-                go.transform.localPosition = Vector3.zero; go.transform.localRotation = Quaternion.Euler(90, 0, 0);   // 게임 부착 규칙
+                go.transform.localPosition = Vector3.zero; go.transform.localRotation = Quaternion.Euler(90, 0, 0) * AssetDatabase.LoadAssetAtPath<GameObject>(d.PrefabPath).transform.localRotation;   // 게임 부착 규칙(슬롯 × X+90 × 프리팹 루트 회전)
                 placed[d.Id] = go.transform; all.Add(go);
             }
             var std = Shader.Find("Standard");

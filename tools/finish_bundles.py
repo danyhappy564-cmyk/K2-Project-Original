@@ -1,6 +1,7 @@
 """셰이더까지 고친 Unity 빌드 결과(<버전>-shader)를 설치용 최종 번들(<버전>)로 마무리한다.
 
-  python tools/finish_bundles.py <셰이더 고친 폴더> <새 최종 폴더> [ak5c]
+  python tools/finish_bundles.py <셰이더 고친 폴더> <새 최종 폴더> [ak5c|scar]
+  scar(0.8.0): 도너 컨테이너 바닐라 SCAR Mk16, 왼손 노드 단계 건너뜀
   ak5c(0.7.0): 도너 컨테이너·왼손 기준 손잡이를 WTT-Armory AK5C 번들로(사용자 개인용 — WTT 에셋 포함이라 배포 금지)
 
 1) 부품: 바닐라 M4 부품의 컴포넌트 참조(fix_vanilla_refs) 2) 바닐라 AK-101 컨테이너 개조(reskin_vanilla)
@@ -8,8 +9,8 @@
 """
 import json,os,pathlib,shutil,subprocess,sys
 base=pathlib.Path(__file__).resolve().parent.parent; tools=base/'tools'; src=pathlib.Path(sys.argv[1]); dst=pathlib.Path(sys.argv[2]); game=pathlib.Path('E:/SPT 4.1/EscapeFromTarkov_Data/StreamingAssets/Windows')
-WTT=pathlib.Path('E:/SPT 4.1/SPT_Runtime/user/mods/WTT-Armory/bundles/WeaponAK5C'); AK5C=len(sys.argv)>3 and sys.argv[3]=='ak5c'
-donor_container=WTT/'weapon_ak5c_container.bundle' if AK5C else game/'assets/content/weapons/ak100/weapon_izhmash_ak101_556x45_container.bundle'
+WTT=pathlib.Path('E:/SPT 4.1/SPT_Runtime/user/mods/WTT-Armory/bundles/WeaponAK5C'); DONOR=sys.argv[3] if len(sys.argv)>3 else 'ak101'; AK5C=DONOR=='ak5c'; SCAR=DONOR=='scar'
+donor_container=WTT/'weapon_ak5c_container.bundle' if AK5C else game/'assets/content/weapons/scar/weapon_fn_mk16_556x45_container.bundle' if SCAR else game/'assets/content/weapons/ak100/weapon_izhmash_ak101_556x45_container.bundle'
 assert not dst.exists(),'Refuse overwrite'
 dst.mkdir(parents=True)
 def run(script,*args):subprocess.run([sys.executable,str(tools/script),*map(str,args)],check=True)
@@ -31,5 +32,5 @@ container=dst/'assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_containe
 run('reskin_vanilla.py',donor_container,dst,dst/'reskin-map.json',raw)
 run('fix_container_table.py',raw,container,'assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.prefab')
 os.remove(raw)
-run('fix_part_nodes.py',dst,dst,game,'--inplace',*(['--donor-handguard',WTT/'ak5c_handguard.bundle'] if AK5C else []))
-run('make_bundles_json.py',dst,dst/'validation.json',game,dst/'bundles.json',*(['ak5c'] if AK5C else []))
+run('fix_part_nodes.py',dst,dst,game,'--inplace',*(['--donor-handguard',WTT/'ak5c_handguard.bundle'] if AK5C else ['--no-palm'] if SCAR else []))
+run('make_bundles_json.py',dst,dst/'validation.json',game,dst/'bundles.json',*([DONOR] if DONOR!='ak101' else []))

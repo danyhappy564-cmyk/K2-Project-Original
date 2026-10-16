@@ -40,7 +40,7 @@ def verify(path,root,mapping,donor=DONOR):
   assert orig.get_raw_data()==o.get_raw_data(),f'Unexpected change: {pid} {typ}'
   if 'preserved'+typ in counters:counters['preserved'+typ]+=1
  # AK-101: 모델·simple 두 벌이라 메시 20·fireport 2 / AK5C: 모델 하나라 메시 10·fireport 1
- assert counters['MeshFilter']==counters['MeshRenderer']==expect_mesh and counters['fireport']>=1,counters
+ assert counters['MeshFilter']==counters['MeshRenderer']==expect_mesh,counters   # SCAR: fireport는 총열 부품(0)
  for name,f in old.file.files.items():
   if name.endswith(('.resource','.resS')):
    a=f.bytes; b=new.file.files[name.replace(oc,nc)].bytes;assert hashlib.sha256(a).digest()==hashlib.sha256(b).digest()

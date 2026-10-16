@@ -20,10 +20,14 @@ namespace K2Tools
         // 도너(애니메이션·사운드·손 위치의 원본 무기) — 0.3.0부터 SCAR-L(Mk16): 노리쇠에 붙은 측면 장전손잡이·AR식 탄창/멈치가 K2와 가깝다
         // 0.4.0: 도너 AK-101 — 오른쪽 장전손잡이가 노리쇠에 붙은 구조가 K2와 같다. 바닐라 컨테이너 번들을 직접 개조하므로
         // 여기서는 K2 메시를 AK 노드 기준으로 bake하고 부품 번들을 AK 슬롯 기준으로 만든다(K2Parts.BuildAll -k2Mode reskin).
-        // 0.7.0: 도너 AK5C(WTT-Armory, FN FNC 계열) — 오른쪽 접기·왼쪽 회전 조정간·오른쪽 장전손잡이·STANAG 곧은 삽입이 K2와 같다.
-        // -k2Donor ak5c로 고른다(기본 ak101). AK5C 계층은 ImportDonor(K2Donor.cs)가 WTT 번들에서 SDK 프리팹으로 옮겨 둔다.
-        static bool DonorAK5C => Arg("-k2Donor") == "ak5c";
+        // 도너: ak101(0.4~0.6, 기본) / ak5c(0.7.0, WTT-Armory — 수정 금지 확인 후 보류) / scar(0.8.0, 바닐라 Mk16).
+        // SCAR: 오른쪽 접기·STANAG 곧은 삽입·조정간/방아쇠/해머/멈치가 본체 모델 노드(K2 부품 그대로 끼움). 장전손잡이는 왼쪽(mod_charge 부품) — K2는 노리쇠 메시의 오른쪽 손잡이.
+        // 모드·바닐라 번들의 도너 계층은 ImportDonor(K2Donor.cs)가 SDK 프리팹으로 옮겨 둔다.
+        static string Donor => Arg("-k2Donor") ?? "ak101";
+        static bool DonorAK5C => Donor == "ak5c";
+        static bool DonorSCAR => Donor == "scar";
         static string DonorModelPath => DonorAK5C ? "Assets/K2Ripped/AK5C/weapon_ak5c_prefab.prefab"
+            : DonorSCAR ? "Assets/K2Ripped/SCARV/weapon_fn_mk16_556x45_model.generated.prefab"
             : "Assets/K2Ripped/AK101/Content/Weapons/ak100/weapon_izhmash_ak101_556x45.generated.prefab";
         const string HIDE = "";   // Swaps에서 이 값이면 빈 메시로 숨긴다(K2에 없는 도너 부품)
         // 조준선 보정(m) — all-v007 조준 시점 렌더로 확정(가늠쇠 끝이 화면 중앙). -k2SightDy로 바꿔 시험 가능
@@ -37,16 +41,28 @@ namespace K2Tools
 
         // K2 부품(FBX 오브젝트 이름 뒤쪽) ↔ M4A1 weapon 아래 노드 — 정렬 기준점(하부 조작부 4개, 위·앞뒤 평균).
         // 탄창은 뺀다: K2 탄창 본 머리가 탄창 아래쪽이라 M4A1 mod_magazine(탄창 위쪽)과 116mm 어긋났다(body-v001).
-        static (string k2, string m4)[] Anchors => DonorAK5C ? new[] { ("trigger", "weapon_trigger") } : new[] { ("trigger", "weapon_trigger"), ("hammer", "weapon_hammer") };
+        static (string k2, string m4)[] Anchors => DonorSCAR ? new[] { ("trigger", "mod_trigger_group/mod_trigger") }
+            : DonorAK5C ? new[] { ("trigger", "weapon_trigger") } : new[] { ("trigger", "weapon_trigger"), ("hammer", "weapon_hammer") };
         // 참고로만 오차를 기록하는 쌍
-        static (string k2, string m4)[] InfoPairs => DonorAK5C
+        static (string k2, string m4)[] InfoPairs => DonorSCAR
+            ? new[] { ("magazine", "mod_magazine"), ("bolt_carrier", "weapon_bolt"), ("selector", "mod_trigger_group/mod_selector"), ("hammer", "mod_trigger_group/mod_hammer"), ("bolt_release", "mod_catch") }
+            : DonorAK5C
             ? new[] { ("magazine", "mod_magazine"), ("bolt_carrier", "weapon_bolt"), ("selector", "weapon_selector"), ("bolt_release", "weapon_bolt_catch") }
             : new[] { ("magazine", "mod_magazine"), ("bolt_carrier", "weapon_bolt") };
         // 도너 메시 노드(weapon 기준 경로) → K2 부품. "a+b"는 한 메시로 합친다, HIDE는 빈 메시.
         // AK-101: AK 조정간은 오른쪽 큰 레버로 돌아가는 동작이라 K2 조정간(왼쪽 작은 것)은 총몸에 고정으로 합친다.
         // AK5C: 조정간·노리쇠멈치가 왼쪽에서 M4 동작으로 돈다 — K2 조정간·노리쇠멈치를 그 노드에. 해머 노드가 없어 총몸에 합친다.
         //       총몸(ak5c_frame)은 위·아래 리시버 일체라 K2 하부만(상부는 mod_reciever 부품), 덮개·가늠자·가늠쇠는 K2 부품에 있어 숨긴다.
-        static (string node, string part)[] Swaps => DonorAK5C
+        // SCAR: 본체 메시 = 하부 리시버. 방아쇠 뭉치 하우징·노리쇠 스프링은 K2 하부에 포함/안 보이므로 숨긴다.
+        static (string node, string part)[] Swaps => DonorSCAR
+            ? new[]
+            {
+                ("weapon_fn_mk16_556x45_LOD0", "lower"), ("weapon_fn_mk16_556x45_LOD1", "lower"),
+                ("mod_trigger_group/trigger_group_mk16_fn_std_LOD0", HIDE), ("weapon_bolt/weapon_spring", HIDE),
+                ("weapon_bolt", "bolt_carrier"), ("mod_trigger_group/mod_trigger", "trigger"), ("mod_trigger_group/mod_selector", "selector"),
+                ("mod_trigger_group/mod_hammer", "hammer"), ("mod_catch", "bolt_release"), ("mod_release", "mag_release_R+mag_release_L"),
+            }
+            : DonorAK5C
             ? new[]
             {
                 ("ak5c_frame", "lower+hammer"), ("ak5c_dustcover", HIDE), ("ak5c_fs", HIDE), ("ak5c_rs", HIDE),

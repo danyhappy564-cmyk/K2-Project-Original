@@ -35,7 +35,7 @@ def patch(donor,root,mapfile,out):
    t['m_LocalPosition']=dict(zip('xyz',mapping['transforms']['fireport']));o.save_typetree(t);counts['fireport']+=1
   elif typ=='AudioClip':
    t=o.read_typetree();t['m_Resource']['m_Source']=t['m_Resource']['m_Source'].replace(oldcab,newcab);o.save_typetree(t);counts[typ]+=1
- assert counts['MeshFilter']==counts['MeshRenderer']>0 and counts['fireport']>=1,counts   # AK-101 20/20/2, AK5C 10/10/1
+ assert counts['MeshFilter']==counts['MeshRenderer']>0,counts   # AK-101 20/20 fireport 2, AK5C 10/10/1, SCAR 26/26/0(총구는 총열 부품)
  for o in sf.objects.values():
   if o.type.name!='AssetBundle':continue
   t=o.read_typetree();t['m_Name']=KEY;t['m_AssetBundleName']=KEY
@@ -43,7 +43,8 @@ def patch(donor,root,mapfile,out):
   for name,c in t['m_Container']:
    pre=oldpre[c['preloadIndex']:c['preloadIndex']+c['preloadSize']]+ptrs
    c['preloadIndex']=len(newpre);c['preloadSize']=len(pre);newpre.extend(pre)
-   name=name.replace('/ak100/','/daewoo_k2/').replace('weapon_izhmash_ak101_556x45','weapon_daewoo_k2_556x45')
+   dfolder=pathlib.Path(donor).parent.name.lower(); dbase=pathlib.Path(donor).name.lower().replace('_container.bundle','')   # ak100/weapon_izhmash_ak101_556x45, scar/weapon_fn_mk16_556x45
+   name=name.replace(f'/{dfolder}/','/daewoo_k2/').replace(dbase,'weapon_daewoo_k2_556x45')
    if 'daewoo_k2' not in name and name.lower().endswith('_container.prefab'):name='assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.prefab'   # AK5C 등 다른 도너
    containers.append((name.lower(),c))
   t['m_PreloadTable']=newpre;t['m_Container']=containers

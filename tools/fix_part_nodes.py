@@ -22,6 +22,8 @@ src_root, dst_root, game = sys.argv[1], sys.argv[2], sys.argv[3]
 INPLACE = "--inplace" in sys.argv[4:]
 # 0.7.0: 도너 손잡이(왼손 기준) — 기본 AK-101 기본 구성 AK-74M 손잡이, AK5C 도너면 WTT-Armory ak5c_handguard.bundle(전체 경로)
 DONOR_HG = sys.argv[sys.argv.index("--donor-handguard") + 1] if "--donor-handguard" in sys.argv else None
+# 0.8.0 SCAR 도너: 바닐라 SCAR엔 손바닥 노드가 없어 K2 핸드가드에서도 뺐다(K2Parts) — 왼손 단계를 건너뛴다
+NO_PALM = "--no-palm" in sys.argv
 if os.path.exists(os.path.join(dst_root, "part-nodes.json")): sys.exit(f"STOP: 이미 처리됨 — {dst_root}/part-nodes.json")
 C = "assets/content/"
 K2_CONTAINER = C + "weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle"
@@ -116,7 +118,7 @@ up_root = next(pid for pid, t in upper.tt.items() if t["m_Father"]["m_PathID"] =
 ak_root = next(pid for pid, t in akhg.tt.items() if t["m_Father"]["m_PathID"] == 0)
 
 # AK-101 기본 구성: 손잡이는 본체 mod_handguard 슬롯에 바로 붙는다 / K2: 본체 mod_reciever → K2 상부 mod_handguard
-ak_hg_world = compose(cont.world(cont.find("mod_handguard", under=weapon), weapon), ATTACH)
+ak_hg_world = None if NO_PALM else compose(cont.world(cont.find("mod_handguard", under=weapon), weapon), ATTACH)
 up_world = compose(cont.world(cont.find("mod_reciever", under=weapon), weapon), ATTACH)
 k2_hg_world = compose(compose(up_world, upper.world(upper.find("mod_handguard"), up_root)), ATTACH)
 
@@ -132,9 +134,9 @@ def box(tree, root, root_world):
     return tuple(min(p[i] for p in pts) for i in range(3)), tuple(max(p[i] for p in pts) for i in range(3))
 
 
-ak_box = box(akhg, ak_root, ak_hg_world)
+ak_box = None if NO_PALM else box(akhg, ak_root, ak_hg_world)
 saved = []
-for rel in K2_HANDGUARDS:
+for rel in ([] if NO_PALM else K2_HANDGUARDS):
     hg = Tree(os.path.join(src_root, rel)); name = os.path.basename(rel)
     hg_root = next(pid for pid, t in hg.tt.items() if t["m_Father"]["m_PathID"] == 0)
 

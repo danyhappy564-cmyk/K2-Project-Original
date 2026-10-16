@@ -3,7 +3,7 @@
 각 K2 번들의 dependencyKeys = (Unity가 만든 의존: 공용 텍스처) + shaders·cubemaps + (바닐라 템플릿 번들과 그 의존 전부, Windows.json 기준).
 그리고 번들 안 외부 참조(CAB)가 전부 그 의존 목록 안 번들의 CAB인지 확인한다 — 하나라도 없으면 게임에서 참조가 비어 버린다.
 
-  python tools/make_bundles_json.py <번들 폴더> <validation.json> <게임 StreamingAssets/Windows> <출력 bundles.json> [ak5c]
+  python tools/make_bundles_json.py <번들 폴더> <validation.json> <게임 StreamingAssets/Windows> <출력 bundles.json> [ak5c|scar]
 """
 import os, sys, json
 import UnityPy
@@ -22,6 +22,8 @@ TEMPLATE = {
 manifest = json.load(open(os.path.join(game, "Windows.json"), encoding="utf-8"))
 # 0.7.0 AK5C 도너: 컨테이너 원본이 WTT-Armory 번들 — 그 의존 목록(게임 번들)으로 후보를 만든다
 WTT_MANIFEST = "E:/SPT 4.1/SPT_Runtime/user/mods/WTT-Armory/bundles.json"
+if len(sys.argv) > 5 and sys.argv[5] == "scar":   # 0.8.0 바닐라 SCAR 도너
+    TEMPLATE["assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle"] = "assets/content/weapons/scar/weapon_fn_mk16_556x45_container.bundle"
 if len(sys.argv) > 5 and sys.argv[5] == "ak5c":
     wtt = {e["key"]: e["dependencyKeys"] for e in json.load(open(WTT_MANIFEST, encoding="utf-8"))["manifest"]}
     TEMPLATE["assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle"] = "WeaponAK5C/weapon_ak5c_container.bundle"
