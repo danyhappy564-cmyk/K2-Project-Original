@@ -11,19 +11,22 @@
   + 왼손은 총을 따라 핸드가드를 잡음(0.9.3 — 0.9.2는 왼팔이 원래 동작대로 총을 놓쳐 허공으로 뻗음).
 - 약실 총알·탄피 배출: patron_in_weapon·shellport를 K2 약실 자리로(CHAMBER_SHIFT, 0.9.3).
 - 탄창 넣기: mag_in 클립에서 끼울 자리에 가까울수록 mod_magazine 기울기를 0으로(곧게 밀어 넣음 — K2 탄창이 총 몸을 뚫던 문제).
-- 탄창 칸: mod_magazine·mod_magazine_new +z LIFT(다른 탄창이 K2 탄창 구멍에), K2 전용 탄창 메시는 −LIFT.
+- 탄창 칸: mod_magazine·mod_magazine_new +z LIFT는 끼운 자리 근처(2~8cm)에서만(0.9.4), 탄창을 든 왼손 IK 마커도 같이. K2 전용 탄창 메시는 −LIFT.
+- 접기(0.9.4): 총 굴림 좌우 거울(오른쪽 면이 보임) + 오른손 IK 마커가 손잡이→개머리판 윗면→접음→복귀(K2AnimBakeFoldR, BAKE_FOLD_R).
+  2단계 빌드: BAKE_FOLD_R 없이 1차 → K2AnimBakeFoldR(1차 결과 기준) → 2차. 스트림 곡선은 encode_stream으로 다시 인코딩(+inf 끝 프레임 비움).
+- 1인칭 손은 팔 뼈가 아니라 IK 마커를 따른다(EFT Player.IkProcess) — 손 위치를 바꿀 때는 마커를 바꾼다.
 m_ValueArrayDelta(곡선별 시작·끝 값)도 같은 선형 변환으로 맞춘다.
 
-  python tools/build_anim.py <K2 번들 폴더(ak-v014)> <출력 폴더>   (0.9.3: anim-v009 → ak-v016)
+  python tools/build_anim.py <K2 번들 폴더(ak-v014)> <출력 폴더>   (0.9.4: anim-v010 → ak-v017)
 필요: Codex 작업 폴더(코덱스방/K2-anim-v001)의 ak_graph_v003a·ak_curve_fix_v003a·build_ak_anim_v002a 모듈, bake-ak-v003/ik-curves.json,
       BAKE_R(K2AnimBakeCharge 결과). 조립: ak-v010 + 출력 → ak-v013, bundles.json에 override 번들 항목·컨테이너 의존 추가.
 """
-import sys, pathlib, json, hashlib, copy, math
+import sys, pathlib, json, hashlib, copy, math, struct, statistics
 CODEX = pathlib.Path('F:/코딩/Index/코덱스방/K2-anim-v001')
 sys.path.insert(0, str(CODEX))
 import ak_graph_v003a as G
 from ak_graph_v003a import *   # Graph, bindings, clipdata, modify_scalar, sf, ptr, visit, BODY, DONOR, BASE, ANIM, GAME
-from ak_curve_fix_v003a import unity_to_clip, eval_scalar
+from ak_curve_fix_v003a import unity_to_clip, eval_scalar, stream_frames
 from build_ak_anim_v002a import renamed
 
 SRC = pathlib.Path(sys.argv[1]); OUT = pathlib.Path(sys.argv[2])
@@ -32,14 +35,17 @@ G.SOURCE = SRC
 HINGE = (0.0359, 0.0205)
 LIFT = 0.027   # K2 모델을 올린 양(-k2SightDy 0.011118 − (−0.015882)) — aim_camera·탄창 칸에 같이 더한다
 BAKE_R = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-charge-v001/ik-curves.json'
-BAKE_L = ['F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-fold-v001/ik-curves.json',      # 접기: 왼손이 총을 따라감
-          'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-firemode-v001/ik-curves.json']  # 조정간(총 굴림 거울 뒤)
+BAKE_L = ['F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-firemode-v001/ik-curves.json']  # 조정간(총 굴림 거울 뒤) 왼팔 뼈
+# 1인칭 손은 팔 뼈가 아니라 IK 마커(weapon_L/R_IK_marker, 총 기준)를 따른다(EFT Player.IkProcess — 마커가 손 기준점 10cm 안이면 손잡이 자세로 빨려 듦).
+# 접기 오른손(0.9.4): 오른손이 손잡이를 놓고 개머리판을 잡아 접은 뒤 돌아오는 마커 궤적(K2AnimBakeFoldR, 총 굴림 거울 뒤 기준). 없으면 건너뜀(1차 빌드).
+BAKE_FOLD_R = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldR-v001/fold-right.json'
+MAG_SEAT = (-0.0001, -0.4402, -0.0241)   # AK 탄창 끼운 자리(무기 좌표)
 # 약실 총알·탄피 배출 자리(0.9.3): AK patron_in_weapon(y −0.4555, z −0.0007)이 K2 약실(총열 뒤끝 y −0.4292, 축 z +0.0255)보다
 # 26mm 앞·26mm 아래라 약실 확인 때 총알이 몸통 밖으로 보였다(인게임). 무기 좌표 (0, +0.0263, +0.0262) 이동 — 모든 클립 + 컨테이너 기본값.
 CHAMBER_SHIFT = (0.0, 0.0263, 0.0262)
 CHAMBER_NODES = ('patron_in_weapon', 'shellport')
 SELECTOR = ('ak100_firemode_0', 'ak100_firemode_1')
-MIRROR_NODES = ('weapon',)   # 조정간 클립에서 좌우 거울로 뒤집는 노드(총 굴림) — K2 조정간은 왼쪽
+MIRROR_NODES = ('weapon',)   # 조정간·접기 클립에서 좌우 거울로 뒤집는 노드(총 굴림) — K2 조정간은 왼쪽, 접기는 오른쪽
 R_ARM = {'Base HumanRCollarbone', 'Base HumanRUpperarm', 'Base HumanRForearm1', 'Base HumanRForearm2', 'Base HumanRForearm3', 'Base HumanRPalm',
          'weapon_R_IK_marker', 'weapon_R_hand_marker', 'Bend_Goal_Right'}
 L_ARM = {'Base HumanL*', 'weapon_L_IK_marker', 'weapon_L_hand_marker', 'Bend_Goal_Left'}
@@ -56,6 +62,63 @@ def lin(t, index, scale=1.0, add=0.0):
     modify_scalar(t, index, scale=scale, add=add); vad(t, index, scale, add)
 
 
+F32 = lambda x: struct.unpack('<f', struct.pack('<f', x))[0]
+
+
+def smooth(a, b, x):
+    u = min(1.0, max(0.0, (x - a) / (b - a))); return u * u * (3 - 2 * u)
+
+
+def dense_times(t):
+    de = clipdata(t)['m_DenseClip']; return [de['m_BeginTime'] + i / de['m_SampleRate'] for i in range(de['m_FrameCount'])]
+
+
+def encode_stream(t, repl):
+    """스트림 곡선 몇 개를 표본으로 교체해 다시 인코딩한다. repl = {곡선 번호: (시간들, 값들)}.
+    원본 구조 유지: 첫 프레임(-FLT_MAX)에 모든 곡선 [0,0,0,v], 끝 프레임(+inf)은 키 0개 — Codex v003b는 +inf 프레임에 키를 넣어 Unity가 죽었다.
+    구간마다 3차 Hermite(값·기울기 연속), 마지막 키 [0,0,0,v]. 기존 프레임 시각과 0.2ms 안이면 그 시각에 붙인다."""
+    c = clipdata(t); st = c['m_StreamedClip']; frames = stream_frames(c)
+    assert frames[-1][0] == float('inf') and not frames[-1][1], '스트림 끝 프레임 예상 밖'
+    existing = [tm for tm, _ in frames if abs(tm) < 1e30]
+
+    def snap(x):
+        e = min(existing, key=lambda e: abs(e - x)); return e if abs(e - x) < 2e-4 else F32(x)
+    table = {tm: [(i, cf) for i, cf in rows if i not in repl] for tm, rows in frames}
+    ninf = frames[0][0]
+    for idx, (ts, vs) in repl.items():
+        ts = [snap(x) for x in ts]; n = len(ts)
+        m = [(vs[min(i + 1, n - 1)] - vs[max(i - 1, 0)]) / (ts[min(i + 1, n - 1)] - ts[max(i - 1, 0)]) if n > 1 else 0 for i in range(n)]
+        table[ninf].append((idx, [0.0, 0.0, 0.0, vs[0]]))
+        for i in range(n - 1):
+            h = ts[i + 1] - ts[i]; v0, v1, m0, m1 = vs[i], vs[i + 1], m[i], m[i + 1]
+            A = (2 * (v0 - v1) + h * (m0 + m1)) / h ** 3; B = (3 * (v1 - v0) - h * (2 * m0 + m1)) / h ** 2
+            table.setdefault(ts[i], []).append((idx, [A, B, m0, v0]))
+        table.setdefault(ts[-1], []).append((idx, [0.0, 0.0, 0.0, vs[-1]]))
+    raw = bytearray()
+    for tm in sorted(table):
+        rows = sorted(table[tm], key=lambda r: r[0])
+        if not rows and abs(tm) < 1e30: continue
+        raw += struct.pack('<fI', tm, len(rows))
+        for i, cf in rows: raw += struct.pack('<I4f', i, *cf)
+    t['m_MuscleClipSize'] += len(raw) - 4 * len(st['data'])
+    st['data'] = list(struct.unpack('<%dI' % (len(raw) // 4), raw))
+
+
+def set_samples(t, index, values):
+    """곡선 하나를 밀집 프레임 격자 표본으로 교체(밀집 = 값 직접, 스트림 = 다시 인코딩)."""
+    c = clipdata(t); ns = c['m_StreamedClip']['curveCount']; de = c['m_DenseClip']; nd = de['m_CurveCount']
+    assert len(values) == de['m_FrameCount']
+    if index < ns: encode_stream(t, {index: (dense_times(t), values)})
+    elif index < ns + nd:
+        for f, v in enumerate(values): de['m_SampleArray'][f * nd + index - ns] = v
+    else: raise AssertionError('상수 곡선은 표본으로 못 바꿈')
+    a = t['m_MuscleClip']['m_ValueArrayDelta'][index]; a['m_Start'] = values[0]; a['m_Stop'] = values[-1]
+
+
+def curve_values(t, b, j):
+    c = clipdata(t); return [eval_scalar(c, b['offset'] + j, tm) for tm in dense_times(t)]
+
+
 def main():
     assert not OUT.exists(), '기존 결과 덮어쓰기 금지'
     g = Graph(); base, overrides, refs = g.animation_refs()
@@ -66,6 +129,11 @@ def main():
     for bl in BAKE_L:
         fold = json.loads(pathlib.Path(bl).read_text(encoding='utf-8')); assert fold['passed']
         baked.update({c['name']: c for c in fold['clips']})                     # 왼손이 총(핸드가드)을 따라감(K2AnimBakeFollow)
+    fold_r = {}
+    if pathlib.Path(BAKE_FOLD_R).exists():
+        fj = json.loads(pathlib.Path(BAKE_FOLD_R).read_text(encoding='utf-8')); assert fj['passed'], fj['error']
+        fold_r = {c['name']: c for c in fj['clips']}
+    print('접기 오른손 궤적', list(fold_r) or '없음(1차 빌드)')
     changed = {}; changes = []
     for data in baked.values():
         for sample in data['frames']:
@@ -128,7 +196,7 @@ def main():
                     for j in range(b['dim']): lin(t, b['offset'] + j, scale=0, add=eval_scalar(c, b['offset'] + j, 0))
                     row.setdefault('frozen', []).append(last)
         # 조정간(0.9.2): AK는 총을 굴려 오른쪽 레버를 보여 준다 — K2 조정간은 왼쪽이라 총 움직임을 좌우 거울(위치 x, 회전 y·z 부호)
-        if t['m_Name'] in SELECTOR:
+        if t['m_Name'] in SELECTOR or t['m_Name'] in FOLD:
             for b in bs:
                 if b['path'].split('/')[-1] in MIRROR_NODES:
                     if b['attribute'] == 1: lin(t, b['offset'], scale=-1); row.setdefault('mirror', []).append('pos')
@@ -151,17 +219,47 @@ def main():
                         k = f * nd + rot['offset'] - ns + j; a[k] *= w
                     n += w < 0.999
                 row['magStraight'] = n
-        # 탄창 칸(0.9.1): K2를 27mm 올린 만큼 mod_magazine·mod_magazine_new도 무기 +z 27mm(다른 탄창이 K2 탄창 구멍에 맞게).
-        # K2 전용 탄창 메시는 −27mm(mag_parts)로 지금 자리 유지.
+        # 탄창 칸(0.9.4): K2를 올린 만큼 +LIFT — 끼운 자리 근처(2cm 안 = 전부, 8cm 밖 = 0)에서만. 0.9.1~0.9.3은 늘 올려서 손에 든 탄창이 손 위로 떴다.
+        # K2 전용 탄창 메시는 -LIFT(shift_children)라 손에 들면 바닐라 탄창과 같은 자리. 탄창을 든 왼손 마커도 같은 만큼 올린다.
+        lifts = {}
         for b in bs:
-            if b['attribute'] == 1 and b['path'].split('/')[-1] in ('mod_magazine', 'mod_magazine_new'):
-                lin(t, b['offset'] + 2, add=LIFT); row.setdefault('mag', []).append(b['path'].split('/')[-1])
+            nm = b['path'].split('/')[-1]
+            if b['attribute'] != 1 or nm not in ('mod_magazine', 'mod_magazine_new'): continue
+            P = [curve_values(t, b, j) for j in range(3)]; d = [math.dist([P[0][f], P[1][f], P[2][f]], MAG_SEAT) for f in range(len(P[0]))]
+            if max(d) < 0.005: lin(t, b['offset'] + 2, add=LIFT); row.setdefault('mag', []).append(nm + ':fixed'); continue
+            assert b['storage'] == 'dense', (t['m_Name'], nm, b['storage'])
+            w = [1 - smooth(0.02, 0.08, x) for x in d]
+            set_samples(t, b['offset'] + 2, [z + LIFT * k for z, k in zip(P[2], w)])
+            lifts[nm] = (P, d, w); row.setdefault('mag', []).append(nm + ':near-seat')
+        lm = next((b for b in bs if b['path'].endswith('/weapon_L_IK_marker') and b['attribute'] == 1), None)
+        if lifts and lm:
+            L = [curve_values(t, lm, j) for j in range(3)]; n = len(L[0]); hand = [0.0] * n
+            for nm, (P, d, w) in lifts.items():
+                hd = [math.dist([L[0][f], L[1][f], L[2][f]], [P[0][f], P[1][f], P[2][f]]) for f in range(n)]
+                held_frames = [hd[f] for f in range(n) if d[f] > 0.05]
+                if not held_frames: continue
+                hold = statistics.median(held_frames)   # 탄창을 들 때 손-탄창 노드 거리(AK 약 21~22cm, 핸드가드 잡을 때 약 9cm)
+                for f in range(n): hand[f] = max(hand[f], LIFT * w[f] * (1 - smooth(0.02, 0.05, abs(hd[f] - hold))))
+            if max(hand) > 0.0005:
+                set_samples(t, lm['offset'] + 2, [z + h for z, h in zip(L[2], hand)]); row['magHand'] = round(max(hand), 4)
         for b in bs:
             if b['attribute'] == 1 and b['path'].split('/')[-1] in CHAMBER_NODES:
                 assert b['path'].endswith('/weapon/' + b['path'].split('/')[-1]), b['path']   # 부모가 weapon이라 로컬 = 무기 좌표
                 for j in range(3):
                     if CHAMBER_SHIFT[j]: lin(t, b['offset'] + j, add=CHAMBER_SHIFT[j])
                 row.setdefault('chamber', []).append(b['path'].split('/')[-1])
+        if t['m_Name'] in fold_r:
+            fr = fold_r[t['m_Name']]; n = clipdata(t)['m_DenseClip']['m_FrameCount']; assert len(fr['frames']) == n, (len(fr['frames']), n)
+            for b in bs:
+                if b['path'].endswith('/weapon_R_IK_marker') and b['attribute'] in (1, 4):
+                    for j, ax in enumerate('xyz'):
+                        if b['attribute'] == 1: vals = [f['pos'][ax] for f in fr['frames']]
+                        else:
+                            vals = []; prev = curve_values(t, b, j)[0]
+                            for f in fr['frames']:
+                                v = unity_to_clip(f['rot'])[ax]; v += 360 * round((prev - v) / 360); vals.append(v); prev = v
+                        set_samples(t, b['offset'] + j, vals)
+                    row.setdefault('foldR', []).append(b['attribute'])
         changed[ident] = t; changes.append(row)
     assert len(changed) == 98, len(changed)
 

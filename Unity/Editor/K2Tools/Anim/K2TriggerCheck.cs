@@ -113,6 +113,15 @@ namespace K2Tools
                     c.transform.position = (a + bpos) / 2; c.transform.rotation = Quaternion.FromToRotation(Vector3.up, dd.normalized);
                     float rad = t.name.Contains("Digit") ? .003f : .007f; c.transform.localScale = new Vector3(rad * 2, dd.magnitude / 2, rad * 2); c.GetComponent<Renderer>().sharedMaterial = hand;
                 }
+                // IK 마커(1인칭 손이 실제로 가는 자리): 오른손 빨강, 왼손 초록 구
+                foreach (var (mk, col) in new[] { ("weapon_R_IK_marker", Color.red), ("weapon_L_IK_marker", Color.green) })
+                {
+                    var t = Find(model.transform, mk); var ball = GameObject.CreatePrimitive(PrimitiveType.Sphere); UnityEngine.Object.DestroyImmediate(ball.GetComponent<Collider>());
+                    ball.transform.position = t.position; ball.transform.localScale = Vector3.one * .018f; ball.GetComponent<Renderer>().sharedMaterial = new Material(Shader.Find("Unlit/Color")) { color = col };
+                    var ax = GameObject.CreatePrimitive(PrimitiveType.Cylinder); UnityEngine.Object.DestroyImmediate(ax.GetComponent<Collider>());
+                    ax.transform.position = t.position + t.forward * .02f; ax.transform.rotation = Quaternion.FromToRotation(Vector3.up, t.forward); ax.transform.localScale = new Vector3(.004f, .02f, .004f); ax.GetComponent<Renderer>().sharedMaterial = ball.GetComponent<Renderer>().sharedMaterial;
+                    log.AppendLine($"  {mk} 무기 {W(t.position).ToString("F4")}");
+                }
                 var cam = new GameObject("C").AddComponent<Camera>(); cam.orthographic = true; cam.orthographicSize = float.TryParse(A("-k2Size"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var sz) ? sz : .09f; cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(.06f, .07f, .09f); cam.nearClipPlane = .01f; cam.farClipPlane = 5;
                 var look = Find(model.transform, A("-k2Look") ?? "weapon_trigger").position;
                 var cv = (A("-k2Cam") ?? "0.6,0,0").Split(',').Select(x => float.Parse(x, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
