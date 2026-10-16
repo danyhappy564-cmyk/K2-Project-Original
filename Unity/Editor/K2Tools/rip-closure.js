@@ -1,8 +1,8 @@
 // AssetRipper 추출본(ExportedProject/Assets)에서 M4A1 폴더가 참조하는 파일만 SDK로 복사하고 스크립트 GUID를 SDK 것으로 바꾼다.
-// node rip-closure.js <추출본 Assets> <SDK Assets> <SDK 안 대상 폴더> [dry]
+// node rip-closure.js <추출본 Assets> <SDK Assets> <SDK 안 대상 폴더> <dry|copy> [시작 폴더]
 // 추출본에서 M4A1 폴더 에셋이 참조하는 파일들(GUID 연쇄)을 모아 SDK로 복사하고, 스크립트 GUID를 SDK 스크립트로 바꾼다.
 const fs=require("fs"),path=require("path");
-const [,,RIP,SDK,DEST_REL,DRY]=process.argv;  // RIP=.../ExportedProject/Assets, SDK=.../EFT-SDK/Assets
+const [,,RIP,SDK,DEST_REL,DRY,START_REL]=process.argv;  // START_REL: 추출본 안 시작 폴더(기본 Content/Weapons/m4a1)
 const walk=(d,out=[])=>{for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);e.isDirectory()?walk(p,out):out.push(p);}return out;};
 const idx=(root)=>{const m={};for(const f of walk(root))if(f.endsWith(".meta")){const g=(fs.readFileSync(f,"utf8").match(/^guid: (\w+)/m)||[])[1];if(g)m[g]=f.slice(0,-5);}return m;};
 const rip=idx(RIP), sdk=idx(SDK);
@@ -11,7 +11,7 @@ const sdkScript={};for(const [g,p] of Object.entries(sdk))if(p.endsWith(".cs"))s
 const scriptMap={},missingScripts=[];
 for(const [g,p] of Object.entries(rip))if(p.endsWith(".cs")){const n=path.basename(p,".cs");if(sdkScript[n])scriptMap[g]=sdkScript[n];else missingScripts.push(n);}
 const textExt=/\.(prefab|controller|overrideController|anim|asset|mat|mask)$/;
-const start=walk(path.join(RIP,"Content/Weapons/m4a1")).filter(f=>!f.endsWith(".meta"));
+const start=walk(path.join(RIP,START_REL||"Content/Weapons/m4a1")).filter(f=>!f.endsWith(".meta"));
 const todo=[...start],need=new Set(),reuse=new Set();
 while(todo.length){const f=todo.pop();if(need.has(f))continue;need.add(f);
  if(!textExt.test(f))continue;const t=fs.readFileSync(f,"utf8");

@@ -14,7 +14,7 @@ using UnityEngine;
 
 namespace K2Tools
 {
-    public static class K2Builder
+    public static partial class K2Builder
     {
         const string M4 = "Assets/K2Ripped/M4A1/Content/Weapons/m4a1/";
         const string SRC = "Assets/K2/Source/";
@@ -219,6 +219,13 @@ namespace K2Tools
                     Place(go.transform, part);
                     lod0Extra.Add(go.GetComponent<MeshRenderer>());
                     L($"  {rootName}: 추가 {part} (부모 {(parent == "" ? "weapon" : parent)})");
+                }
+                // 애니메이션이 움직이지 않는 슬롯은 K2 부품 위치로 옮긴다(부품 번들이 이 위치에 붙는다) — 3단계 parts-v001
+                foreach (var (slot, part) in new[] { ("mod_reciever", "upper"), ("mod_stock", "stock") })
+                {
+                    var s = weapon.Find(slot);
+                    s.position = root.transform.TransformPoint(parts[part].localPosition + off);
+                    s.rotation = root.transform.rotation;
                 }
                 if (lod)
                 {
