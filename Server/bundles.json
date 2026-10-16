@@ -65,6 +65,30 @@
       ]
     },
     {
+      "key": "assets/content/items/mods/handguards/handguard_daewoo_k2_classic.bundle",
+      "dependencyKeys": [
+        "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
+        "shaders",
+        "cubemaps"
+      ]
+    },
+    {
+      "key": "assets/content/items/mods/stocks/stock_daewoo_k2_ar.bundle",
+      "dependencyKeys": [
+        "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
+        "shaders",
+        "cubemaps"
+      ]
+    },
+    {
+      "key": "assets/content/items/mods/stocks/stock_daewoo_k2_light.bundle",
+      "dependencyKeys": [
+        "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
+        "shaders",
+        "cubemaps"
+      ]
+    },
+    {
       "key": "assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle",
       "dependencyKeys": [
         "assets/content/weapons/daewoo_k2/daewoo_k2_body_meshes.bundle",
