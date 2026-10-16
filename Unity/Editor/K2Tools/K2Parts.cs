@@ -176,7 +176,9 @@ namespace K2Tools
                                 var delta = mf0 ? want - mf0.localPosition : Vector3.zero;
                                 foreach (var t in r.GetComponentsInChildren<Transform>(true).Where(t => t.name.StartsWith("muzzleflash_")))
                                     if (t.parent == r) t.localPosition += delta;
-                                var sub = r.Cast<Transform>().FirstOrDefault(t => t.name == "mod_muzzle"); if (sub) Put(sub, front);
+                                // 소음기 칸: 바닐라 A2처럼 소염기 밑동(뒤끝 + 1.7mm)에 — 소음기가 소염기를 덮어씌운다.
+                                // 0.6.0까지 앞끝에 둬서 소음기가 소염기 앞에 따로 붙었다(인게임 "소음기 끼우면 저렇게 보임")
+                                var sub = r.Cast<Transform>().FirstOrDefault(t => t.name == "mod_muzzle"); if (sub) Put(sub, new Vector3(boreX, boreY, b.min.z + 0.0017f));
                                 break;
                             }
                             case "handguard_classic":
