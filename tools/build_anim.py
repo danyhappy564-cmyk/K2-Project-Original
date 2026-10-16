@@ -1,9 +1,10 @@
 """K2 동작 번들(anim-v004, Claude) — Codex build_final_anim_v003b.py를 바탕으로 접기 위치만 다른 방식으로.
 
 Codex v003b: 접기 위치 곡선(스트림)을 프레임마다 키를 새로 넣어 다시 인코딩 → Unity SampleAnimation에서 네이티브 크래시(EvaluateClip).
-여기서는 다시 인코딩하지 않는다. 오른쪽 접기 = 펼친 상태의 mod_stock x(=c)를 지나는 좌우 거울:
-  회전 오일러 y·z 부호 반전(어떤 회전 순서든 M·R·M), 위치 x → 2c − x (y·z 그대로). 둘 다 기존 키 계수의 선형 변환이라
-  modify_scalar(scale, add)로 끝난다(스트림 키 수·구조 불변).
+여기서는 다시 인코딩하지 않는다. 오른쪽 접기 = 총 중심선(x=0) 기준 좌우 거울:
+  모든 클립의 mod_stock 위치 x → −x(펼친 축 −15.3mm → +15.3mm), 접기 클립은 회전 오일러 y·z 부호 반전(어떤 회전 순서든 M·R·M).
+  둘 다 기존 키 계수의 선형 변환이라 modify_scalar(scale)로 끝난다(스트림 키 수·구조 불변).
+  축이 30.6mm 오른쪽으로 간 만큼 컨테이너의 mod_stock 기본 위치도 거울, K2 개머리판 3종 메시는 2·pivot_x(−30.6mm) 옮겨 상쇄(mirror_parts).
 카메라(+z 0.027)·장전 IK(dense)는 Codex 그대로. m_ValueArrayDelta(곡선별 시작·끝 값)도 같은 변환으로 맞춘다.
 
   python tools/build_anim.py <K2 번들 폴더(ak-v010)> <출력 폴더>
