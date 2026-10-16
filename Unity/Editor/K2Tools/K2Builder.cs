@@ -71,10 +71,10 @@ namespace K2Tools
             }
             : new[]
             {
-                ("weapon_izhmash_ak101_556x45_LOD0", "lower+selector+bolt_release"), ("weapon_izhmash_ak74m_545x39_LOD1", "lower+selector+bolt_release"),
+                ("weapon_izhmash_ak101_556x45_LOD0", "lower+bolt_release"), ("weapon_izhmash_ak74m_545x39_LOD1", "lower+bolt_release"),
                 ("weapon_izhmash_ak74m_dovetail_LOD0", HIDE), ("weapon_izhmash_ak74m_kolodka_LOD0", HIDE), ("mod_stock_release", HIDE),
                 ("weapon_bolt", "bolt_carrier"), ("weapon_hammer", "hammer"), ("weapon_release", "mag_release_R+mag_release_L"),
-                ("weapon_selector", HIDE), ("weapon_trigger", "trigger"),
+                ("weapon_selector", "selector"), ("weapon_trigger", "trigger"),   // 0.9.5: 조정간 분리 — 노드를 K2 조정간 축으로 옮겨 그 기준으로 bake(아래 Place)
             };
         static readonly (string parent, string part)[] Extras = { };
         // 개조 매핑: 도너 메시 노드 GameObject 이름 → (bake 메시 이름, 재질 이름들) — tools/reskin_vanilla.py가 쓴다
@@ -254,6 +254,17 @@ namespace K2Tools
                     }
                     var names = part.Split('+');
                     var src = parts[names[0]];
+                    if (part == "selector" && t.parent && t.parent.name == "weapon_selector" && !DonorSCAR && !DonorAK5C)
+                    {   // 0.9.5: K2 조정간 축 = 원본 리그 selector 뼈 머리(작업 모델 기준 레버 메시 경계의 앞뒤 0.725·높이 0.503, 총구 쪽에서) — 노드를 축으로 옮긴다.
+                        // 클립이 weapon_selector 위치를 매 프레임 쓰므로 tools/build_anim.py가 모든 클립·컨테이너의 위치를 이 값으로 바꾼다(selector-pivot.json).
+                        var b = src.GetComponent<MeshFilter>().sharedMesh.bounds;
+                        var pivotLocal = new Vector3(b.center.x, b.min.y + .503f * b.size.y, b.max.z - .725f * b.size.z);
+                        var pivotBody = src.localPosition + off + src.localRotation * pivotLocal;
+                        var node = t.parent; node.position = root.transform.TransformPoint(pivotBody);
+                        var w = node.parent; var lp = node.localPosition;
+                        L($"  조정간 축(weapon_selector 로컬, 부모 {w.name}): {lp.x:R} {lp.y:R} {lp.z:R}");
+                        File.WriteAllText(Path.Combine(Arg("-k2Out"), "selector-pivot.json"), $"{{\"x\":{lp.x.ToString("R", System.Globalization.CultureInfo.InvariantCulture)},\"y\":{lp.y.ToString("R", System.Globalization.CultureInfo.InvariantCulture)},\"z\":{lp.z.ToString("R", System.Globalization.CultureInfo.InvariantCulture)}}}");
+                    }
                     var nodeM = root.transform.worldToLocalMatrix * t.localToWorldMatrix;   // 본체 공간에서 노드 행렬
                     var mesh = names.Length == 1
                         ? Bake(src.GetComponent<MeshFilter>().sharedMesh, nodeM.inverse * Matrix4x4.Translate(src.localPosition + off), $"{rootName}_{t.name}")

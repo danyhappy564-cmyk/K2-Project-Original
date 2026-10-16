@@ -38,8 +38,15 @@ BAKE_R = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/
 BAKE_L = ['F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-firemode-v001/ik-curves.json']  # 조정간(총 굴림 거울 뒤) 왼팔 뼈
 # 1인칭 손은 팔 뼈가 아니라 IK 마커(weapon_L/R_IK_marker, 총 기준)를 따른다(EFT Player.IkProcess — 마커가 손 기준점 10cm 안이면 손잡이 자세로 빨려 듦).
 # 접기 오른손(0.9.4): 오른손이 손잡이를 놓고 개머리판을 잡아 접은 뒤 돌아오는 마커 궤적(K2AnimBakeFoldR, 총 굴림 거울 뒤 기준). 없으면 건너뜀(1차 빌드).
-BAKE_FOLD_R = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldR-v001/fold-right.json'
+BAKE_FOLD_R = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldR-fr013/fold-right.json'   # 0.9.5: G36 오른손 상대 자세 이식(K2AnimBakeFoldDonor)
 MAG_SEAT = (-0.0001, -0.4402, -0.0241)   # AK 탄창 끼운 자리(무기 좌표)
+# 조정간(0.9.5): K2 조정간 메시를 weapon_selector에 분리(K2Builder, ak-v019) — 노드를 K2 축으로(빌드 출력 selector-pivot.json), 회전은 M16식.
+# 메시는 노드 회전 x 5.85°(AK 프리팹 기본)에서 구웠다 = K2 안전(레버 앞). 단발 = 위로 90°, 연발 = 뒤로 180°(+x축 기준 음수가 앞→위).
+# AK 클립 값: 단발 5.793°, 연발 0.445° → x' = −174.15 + (x − 0.445)·90/5.348
+SELECTOR_PIVOT = (-0.003088481, -0.284393162, -0.0126879439)
+SELECTOR_SCALE = 90 / (5.793 - 0.445); SELECTOR_ADD = -174.15 - 0.445 * SELECTOR_SCALE
+RELEASE_ANGLE, RELEASE_PUSH = 28.0, 0.003   # AK 멈치 최대 회전(°) → K2 버튼 눌림(m)
+MAG_STRAIGHT, MAG_BLEND = 0.08, 0.13      # 이 거리 안은 곧은 경로, 그 사이는 섞음(K2 탄창은 끼우면 입구 위로 53mm 들어감)
 # 약실 총알·탄피 배출 자리(0.9.3): AK patron_in_weapon(y −0.4555, z −0.0007)이 K2 약실(총열 뒤끝 y −0.4292, 축 z +0.0255)보다
 # 26mm 앞·26mm 아래라 약실 확인 때 총알이 몸통 밖으로 보였다(인게임). 무기 좌표 (0, +0.0263, +0.0262) 이동 — 모든 클립 + 컨테이너 기본값.
 CHAMBER_SHIFT = (0.0, 0.0263, 0.0262)
@@ -113,6 +120,48 @@ def set_samples(t, index, values):
         for f, v in enumerate(values): de['m_SampleArray'][f * nd + index - ns] = v
     else: raise AssertionError('상수 곡선은 표본으로 못 바꿈')
     a = t['m_MuscleClip']['m_ValueArrayDelta'][index]; a['m_Start'] = values[0]; a['m_Stop'] = values[-1]
+
+
+def qmul(a, b):
+    x1, y1, z1, w1 = a; x2, y2, z2, w2 = b
+    return (w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2, w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2, w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2, w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2)
+
+
+def qinv(q): return (-q[0], -q[1], -q[2], q[3])
+
+
+def qrot(q, v):
+    r = qmul(qmul(q, (v[0], v[1], v[2], 0.0)), qinv(q)); return [r[0], r[1], r[2]]
+
+
+def qslerp(a, b, t):
+    dot = sum(x * y for x, y in zip(a, b))
+    if dot < 0: b = tuple(-x for x in b); dot = -dot
+    if dot > 0.9995:
+        r = [x + (y - x) * t for x, y in zip(a, b)]
+    else:
+        th = math.acos(dot); s0 = math.sin((1 - t) * th) / math.sin(th); s1 = math.sin(t * th) / math.sin(th); r = [s0 * x + s1 * y for x, y in zip(a, b)]
+    n = math.sqrt(sum(x * x for x in r)); return tuple(x / n for x in r)
+
+
+def clip_quat(e):
+    """클립 오일러(도) → 쿼터니언. 클립 순서 Z·Y·X(q = qz·qy·qx) — ak_curve_fix unity_to_clip과 같은 규약."""
+    hx, hy, hz = [math.radians(v) / 2 for v in e]
+    qx = (math.sin(hx), 0.0, 0.0, math.cos(hx)); qy = (0.0, math.sin(hy), 0.0, math.cos(hy)); qz = (0.0, 0.0, math.sin(hz), math.cos(hz))
+    return qmul(qmul(qz, qy), qx)
+
+
+def quat_clip(q):
+    x, y, z, w = q
+    return [math.degrees(math.atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y))), math.degrees(math.asin(max(-1, min(1, 2 * (w * y - z * x))))),
+            math.degrees(math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z)))]
+
+
+def unwrap(eul, ref):
+    """오일러 표본을 원래 곡선(ref) 근처 각도로(±360) 맞춰 튀지 않게."""
+    out = []
+    for e, r in zip(eul, ref): out.append([v + 360 * round((rv - v) / 360) for v, rv in zip(e, r)])
+    return out
 
 
 def curve_values(t, b, j):
@@ -195,6 +244,16 @@ def main():
                     c = clipdata(t)
                     for j in range(b['dim']): lin(t, b['offset'] + j, scale=0, add=eval_scalar(c, b['offset'] + j, 0))
                     row.setdefault('frozen', []).append(last)
+        # 왼손(0.9.5): 접기·조정간 클립은 왼손 IK 마커 = 왼손 기준점(weapon_L_hand_marker) — 10cm 안이면 게임이 핸드가드 GripPose로 붙인다.
+        # 0.9.4는 마커를 첫 프레임 값으로만 고정해 기준점과 어긋나(검사기: 핸드가드와 54mm) 접는 동안 왼손이 떠 있었다. G36 접기도 마커 = 기준점(1mm).
+        if t['m_Name'] in FOLD or t['m_Name'] in SELECTOR:
+            for attr in (1, 4):
+                src = next((x for x in bs if x['path'].endswith('/weapon_L_hand_marker') and x['attribute'] == attr), None)
+                dst = next((x for x in bs if x['path'].endswith('/weapon_L_IK_marker') and x['attribute'] == attr), None)
+                if src and dst:
+                    c = clipdata(t)
+                    for j in range(3): lin(t, dst['offset'] + j, scale=0, add=eval_scalar(c, src['offset'] + j, 0))
+                    row.setdefault('lToRef', []).append(attr)
         # 조정간(0.9.2): AK는 총을 굴려 오른쪽 레버를 보여 준다 — K2 조정간은 왼쪽이라 총 움직임을 좌우 거울(위치 x, 회전 y·z 부호)
         if t['m_Name'] in SELECTOR or t['m_Name'] in FOLD:
             for b in bs:
@@ -202,46 +261,76 @@ def main():
                     if b['attribute'] == 1: lin(t, b['offset'], scale=-1); row.setdefault('mirror', []).append('pos')
                     elif b['attribute'] == 4: lin(t, b['offset'] + 1, scale=-1); lin(t, b['offset'] + 2, scale=-1); row.setdefault('mirror', []).append('rot')
                     elif b['attribute'] == 2: raise AssertionError('쿼터니언 곡선은 처리 안 함')
-        # 탄창 넣기(0.9.2): AK는 끼울 자리에서 앞으로 ~25° 기울여 걸었다 젖혀 넣는다 — K2 탄창은 회전 중심보다 위로 길어 총 몸을 뚫는다.
-        # 끼울 자리에 가까울수록 기울기를 0으로(6cm 안 = 0, 14cm 밖 = 원래): 곧게 밀어 넣는 STANAG식. 밀집 곡선만(프레임별).
-        if 'mag_in' in t['m_Name']:
-            c = clipdata(t); de = c['m_DenseClip']; ns = c['m_StreamedClip']['curveCount']; nd = de['m_CurveCount']; a = de['m_SampleArray']
-            pos = next((b for b in bs if b['path'].endswith('/mod_magazine') and b['attribute'] == 1), None)
-            rot = next((b for b in bs if b['path'].endswith('/mod_magazine') and b['attribute'] == 4), None)
-            if pos and rot and rot['storage'] == 'dense':
-                seat = [eval_scalar(c, pos['offset'] + j, t['m_MuscleClip']['m_StopTime']) for j in range(3)]   # 끝 = 끼운 자리
-                n = 0
-                for f in range(de['m_FrameCount']):
-                    tm = de['m_BeginTime'] + f / de['m_SampleRate']
-                    pnow = [eval_scalar(c, pos['offset'] + j, tm) for j in range(3)]
-                    d = math.dist(pnow, seat); u = min(1, max(0, (d - 0.06) / 0.08)); w = u * u * (3 - 2 * u)   # 0.9.3: 1~8cm → 6~14cm(0.9.2 인게임: 2~5cm에서 아직 기울어 리시버 앞을 뚫음)
-                    for j in range(3):
-                        k = f * nd + rot['offset'] - ns + j; a[k] *= w
-                    n += w < 0.999
-                row['magStraight'] = n
-        # 탄창 칸(0.9.4): K2를 올린 만큼 +LIFT — 끼운 자리 근처(2cm 안 = 전부, 8cm 밖 = 0)에서만. 0.9.1~0.9.3은 늘 올려서 손에 든 탄창이 손 위로 떴다.
-        # K2 전용 탄창 메시는 -LIFT(shift_children)라 손에 들면 바닐라 탄창과 같은 자리. 탄창을 든 왼손 마커도 같은 만큼 올린다.
-        lifts = {}
+        # 탄창(0.9.5): M4처럼 탄창 구멍 근처에서는 구멍 축(무기 -z)을 따라 곧게 — AK는 앞을 걸고 젖혀 넣어 구멍 안에서도 앞뒤로 흔들리고 기운다
+        # (검사기 K2Validation 탄창 구멍 검사: 0.9.4 넣기 16mm·빼기 14mm 구멍 밖 = 영상 "탄창이 몸통을 뚫음", 바닐라 M4 넣기 0mm).
+        # 끼운 자리에서 거리 d: d < STRAIGHT = 끼운 자세(회전 0)로 자리 바로 아래 d, STRAIGHT~BLEND = 원래 경로와 섞음, 그 밖 = 원래.
+        # 그다음 K2 높이(+LIFT): 구멍 안(d < 6cm) 전부, 12cm 밖 0. 탄창을 쥔 왼손 IK 마커는 탄창에 붙여 같은 강체 변환으로 따라간다.
+        for nm in ('mod_magazine', 'mod_magazine_new'):
+            pb = next((x for x in bs if x['path'].endswith('/' + nm) and x['attribute'] == 1), None)
+            rb = next((x for x in bs if x['path'].endswith('/' + nm) and x['attribute'] == 4), None)
+            if not pb: continue
+            P = [curve_values(t, pb, j) for j in range(3)]; n = len(P[0])
+            R = [curve_values(t, rb, j) for j in range(3)] if rb else [[0.0] * n] * 3
+            d = [math.dist([P[0][f], P[1][f], P[2][f]], MAG_SEAT) for f in range(n)]
+            if max(d) < 0.005:   # 늘 끼워져 있음
+                lin(t, pb['offset'] + 2, add=LIFT); row.setdefault('mag', []).append(nm + ':fixed'); continue
+            assert rb, (t['m_Name'], nm, '회전 곡선 없음')   # 밀집·스트림 모두 set_samples가 처리
+            newP, newR = [], []
+            for f in range(n):
+                q_old = clip_quat([R[0][f], R[1][f], R[2][f]]); p_old = [P[0][f], P[1][f], P[2][f]]
+                k = 1 - smooth(MAG_STRAIGHT, MAG_BLEND, d[f])           # 1 = 곧은 경로
+                p_s = [MAG_SEAT[0], MAG_SEAT[1], MAG_SEAT[2] - d[f]]
+                p_n = [p_old[j] + (p_s[j] - p_old[j]) * k for j in range(3)]
+                q_n = qslerp(q_old, (0.0, 0.0, 0.0, 1.0), k)
+                lift = LIFT * (1 - smooth(0.06, 0.12, d[f])); p_n[2] += lift
+                newP.append(p_n); newR.append(q_n)
+            for j in range(3): set_samples(t, pb['offset'] + j, [x[j] for x in newP])
+            eul = unwrap([quat_clip(q) for q in newR], [[R[0][f], R[1][f], R[2][f]] for f in range(n)])
+            for j in range(3): set_samples(t, rb['offset'] + j, [e[j] for e in eul])
+            row.setdefault('mag', []).append(nm + ':straight')
+            # 쥔 손(왼손 마커): 탄창을 쥐고 있는 동안(손-탄창 노드 거리가 '들고 있을 때 거리' ± 2~5cm) 탄창과 같은 강체 변환
+            lm = next((x for x in bs if x['path'].endswith('/weapon_L_IK_marker') and x['attribute'] == 1), None)
+            lr = next((x for x in bs if x['path'].endswith('/weapon_L_IK_marker') and x['attribute'] == 4), None)
+            if not lm: continue
+            L = [curve_values(t, lm, j) for j in range(3)]; LR = [curve_values(t, lr, j) for j in range(3)] if lr else None
+            hd = [math.dist([L[0][f], L[1][f], L[2][f]], [P[0][f], P[1][f], P[2][f]]) for f in range(n)]
+            held_frames = [hd[f] for f in range(n) if d[f] > 0.05]
+            if not held_frames: continue
+            hold = statistics.median(held_frames)
+            outP, outR, moved = [], [], 0.0
+            for f in range(n):
+                hw = 1 - smooth(0.02, 0.05, abs(hd[f] - hold))
+                q_old = clip_quat([R[0][f], R[1][f], R[2][f]]); delta = qmul(newR[f], qinv(q_old))
+                lp = [L[0][f], L[1][f], L[2][f]]; rel = [lp[j] - P[j][f] for j in range(3)]
+                rigid = [newP[f][j] + qrot(delta, rel)[j] for j in range(3)]
+                outP.append([lp[j] + (rigid[j] - lp[j]) * hw for j in range(3)]); moved = max(moved, math.dist(outP[-1], lp))
+                if LR: outR.append(qslerp(clip_quat([LR[0][f], LR[1][f], LR[2][f]]), qmul(delta, clip_quat([LR[0][f], LR[1][f], LR[2][f]])), hw))
+            if moved < 0.0005: continue
+            pass
+            for j in range(3): set_samples(t, lm['offset'] + j, [x[j] for x in outP])
+            if LR:
+                eul = unwrap([quat_clip(q) for q in outR], [[LR[0][f], LR[1][f], LR[2][f]] for f in range(n)])
+                for j in range(3): set_samples(t, lr['offset'] + j, [e[j] for e in eul])
+            row['magHand'] = round(moved, 4)
         for b in bs:
-            nm = b['path'].split('/')[-1]
-            if b['attribute'] != 1 or nm not in ('mod_magazine', 'mod_magazine_new'): continue
-            P = [curve_values(t, b, j) for j in range(3)]; d = [math.dist([P[0][f], P[1][f], P[2][f]], MAG_SEAT) for f in range(len(P[0]))]
-            if max(d) < 0.005: lin(t, b['offset'] + 2, add=LIFT); row.setdefault('mag', []).append(nm + ':fixed'); continue
-            assert b['storage'] == 'dense', (t['m_Name'], nm, b['storage'])
-            w = [1 - smooth(0.02, 0.08, x) for x in d]
-            set_samples(t, b['offset'] + 2, [z + LIFT * k for z, k in zip(P[2], w)])
-            lifts[nm] = (P, d, w); row.setdefault('mag', []).append(nm + ':near-seat')
-        lm = next((b for b in bs if b['path'].endswith('/weapon_L_IK_marker') and b['attribute'] == 1), None)
-        if lifts and lm:
-            L = [curve_values(t, lm, j) for j in range(3)]; n = len(L[0]); hand = [0.0] * n
-            for nm, (P, d, w) in lifts.items():
-                hd = [math.dist([L[0][f], L[1][f], L[2][f]], [P[0][f], P[1][f], P[2][f]]) for f in range(n)]
-                held_frames = [hd[f] for f in range(n) if d[f] > 0.05]
-                if not held_frames: continue
-                hold = statistics.median(held_frames)   # 탄창을 들 때 손-탄창 노드 거리(AK 약 21~22cm, 핸드가드 잡을 때 약 9cm)
-                for f in range(n): hand[f] = max(hand[f], LIFT * w[f] * (1 - smooth(0.02, 0.05, abs(hd[f] - hold))))
-            if max(hand) > 0.0005:
-                set_samples(t, lm['offset'] + 2, [z + h for z, h in zip(L[2], hand)]); row['magHand'] = round(max(hand), 4)
+            if b['path'].split('/')[-1] != 'weapon_selector': continue
+            if b['attribute'] == 1:
+                for j in range(3): lin(t, b['offset'] + j, scale=0, add=SELECTOR_PIVOT[j])
+                row.setdefault('selector', []).append('pos')
+            elif b['attribute'] == 4:
+                lin(t, b['offset'], scale=SELECTOR_SCALE, add=SELECTOR_ADD); row.setdefault('selector', []).append('rot')
+        # 탄창 멈치(0.9.5): AK는 weapon_release 레버를 x축으로 약 28° 돌린다 — K2(M16식)는 오른쪽 버튼이 안쪽으로 눌린다.
+        # M4 mag_out 멈치는 회전 0·x 약 3mm(Codex 조사). 같은 타이밍(AK 회전량 비율)으로 회전 대신 무기 −x로 RELEASE_PUSH 이동.
+        rr = next((x for x in bs if x['path'].endswith('/weapon_release') and x['attribute'] == 4), None)
+        rp = next((x for x in bs if x['path'].endswith('/weapon_release') and x['attribute'] == 1), None)
+        if rr and rr['storage'] != 'constant':
+            RX = curve_values(t, rr, 0)
+            if max(abs(v) for v in RX) > 1.0:
+                press = [min(1.0, abs(v) / RELEASE_ANGLE) for v in RX]
+                set_samples(t, rr['offset'], [0.0] * len(RX))
+                if rp and rp['storage'] != 'constant':
+                    PX = curve_values(t, rp, 0); set_samples(t, rp['offset'], [x - RELEASE_PUSH * k for x, k in zip(PX, press)]); row['release'] = 'push'
+                else: row['release'] = 'rot0-only'
         for b in bs:
             if b['attribute'] == 1 and b['path'].split('/')[-1] in CHAMBER_NODES:
                 assert b['path'].endswith('/weapon/' + b['path'].split('/')[-1]), b['path']   # 부모가 weapon이라 로컬 = 무기 좌표
@@ -342,6 +431,14 @@ def main():
                 for k, v in zip('xyz', CHAMBER_SHIFT): tr['m_LocalPosition'][k] += v
                 o.save_typetree(tr); nch += 1
     print('약실·배출 노드(컨테이너)', nch)
+    nsel = 0
+    for o in body.objects.values():
+        if o.type.name == 'Transform':
+            tr = o.read_typetree()
+            if gos.get(tr['m_GameObject']['m_PathID']) == 'weapon_selector':
+                for k, v in zip('xyz', SELECTOR_PIVOT): tr['m_LocalPosition'][k] = v
+                o.save_typetree(tr); nsel += 1
+    print('조정간 노드(컨테이너)', nsel)
     shift_children(SRC, OUT / 'bundles', MAGS, (0, -LIFT, 0))   # 슬롯 회전 0(평소 자세) → 루트 기준 = X−90 × (0,0,−LIFT) = (0, −LIFT, 0)
     renamed(bodyenv, 'CAB-' + hashlib.sha256(b'K2-anim-v004-claude-container').hexdigest()[:32])
     dest = OUT / 'bundles' / BODY; dest.parent.mkdir(parents=True, exist_ok=True); dest.write_bytes(bodyenv.file.save(packer='lz4'))
