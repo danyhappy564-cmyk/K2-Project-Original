@@ -8,14 +8,10 @@
       ]
     },
     {
-      "key": "assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle",
+      "key": "assets/content/weapons/daewoo_k2/daewoo_k2_body_meshes.bundle",
       "dependencyKeys": [
-        "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
         "shaders",
-        "cubemaps",
-        "assets/systems/effects/muzzleflash/muzzleflash.bundle",
-        "assets/systems/effects/heathaze/defaultheathaze.bundle",
-        "assets/content/weapons/wip/kibas tuning prefabs/muzzlejets_templates/default_assets.bundle"
+        "cubemaps"
       ]
     },
     {
@@ -66,6 +62,30 @@
         "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
         "shaders",
         "cubemaps"
+      ]
+    },
+    {
+      "key": "assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle",
+      "dependencyKeys": [
+        "assets/content/weapons/daewoo_k2/daewoo_k2_body_meshes.bundle",
+        "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
+        "shaders",
+        "cubemaps",
+        "assets/systems/effects/smoke.bundle",
+        "assets/systems/effects/muzzleflash/muzzleflash.bundle",
+        "assets/systems/effects/heathaze/defaultheathaze.bundle",
+        "assets/content/weapons/wip/kibas tuning prefabs/muzzlejets_templates/default_assets.bundle",
+        "assets/content/weapons/pp-19-01/textures/client_assets.bundle",
+        "assets/content/weapons/ak74m/textures/client_assets.bundle",
+        "assets/content/weapons/ak100/textures/client_assets.bundle",
+        "assets/content/weapons/ak100/client_assets.bundle",
+        "assets/content/items/mods/handguards/handguard_pp-19-01_izhmash_vityaz_std_plastic_textures.bundle",
+        "assets/content/audio/weapons/saiga12.bundle",
+        "assets/content/audio/weapons/generic",
+        "assets/content/audio/weapons/ak74.bundle",
+        "assets/commonassets/physics/physicsmaterials.bundle",
+        "assets/content/weapons/ak100/weapon_izhmash_ak102_556x45_container.bundle",
+        "assets/content/audio/banks/ak101.bundle"
       ]
     }
   ]

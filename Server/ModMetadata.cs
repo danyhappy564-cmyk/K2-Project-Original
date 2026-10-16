@@ -7,7 +7,7 @@ public record ModMetadata : IModMetadata
     public string ModGuid { get; init; } = "com.rf.k2projectoriginal";
     public string Name { get; init; } = "K2-Project-Original";
     public string Author { get; init; } = "R_F";
-    public SemanticVersioning.Version Version { get; init; } = new("0.3.0");
+    public SemanticVersioning.Version Version { get; init; } = new("0.4.0");
     public SemanticVersioning.Range SptVersion { get; init; } = new("~4.1.0");
     public string License { get; init; } = "All rights reserved";
     public bool HasPrepatcher { get; init; } = false;

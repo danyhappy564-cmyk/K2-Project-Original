@@ -11,7 +11,7 @@ import UnityPy
 root, validation, game, out = sys.argv[1:5]
 # K2 번들 → 바닐라 템플릿 번들(참조를 옮겨 심은 원본)
 TEMPLATE = {
-    "assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle": "assets/content/weapons/scar/weapon_fn_mk16_556x45_container.bundle",
+    "assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle": "assets/content/weapons/ak100/weapon_izhmash_ak101_556x45_container.bundle",
     "assets/content/items/mods/barrels/barrel_daewoo_k2_465mm.bundle": "assets/content/items/mods/barrels/barrel_ar15_370mm.bundle",
     "assets/content/items/mods/muzzle/muzzle_daewoo_k2_std_556x45.bundle": "assets/content/items/mods/muzzle/muzzle_ar15_colt_usgi_a2_556x45.bundle",
     "assets/content/items/mods/handguards/handguard_daewoo_k2_mits_long.bundle": "assets/content/items/mods/handguards/handguard_ar15_colt_m4_length_std.bundle",
@@ -70,3 +70,4 @@ json.dump({"manifest": result}, open(out, "w", encoding="utf-8"), indent=2)
 for k, m in problems:
     print("  못 찾음", k.split("/")[-1], m)
 sys.exit(1 if problems else 0)
+

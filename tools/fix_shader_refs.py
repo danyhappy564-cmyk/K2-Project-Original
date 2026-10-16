@@ -102,6 +102,12 @@ for dirpath, _, files in os.walk(raw):
                 return len(ext)
 
             for obj in sf.objects.values():
+                if obj.type.name == "AssetBundle":
+                    tree = obj.read_typetree()
+                    for ptr in tree["m_PreloadTable"]:
+                        if ptr["m_FileID"] in fake_idx and ptr["m_PathID"] in remap:
+                            ptr["m_PathID"] = remap[ptr["m_PathID"]]
+                    obj.save_typetree(tree)
                 if obj.type.name != "Material":
                     continue
                 tree = obj.read_typetree()
@@ -138,3 +144,4 @@ with open(os.path.join(out, "shader-fix.json"), "w", encoding="utf-8") as f:
 print("게임 셰이더가 아닌 재질:", len(bad))
 for b in bad:
     print("  ", b)
+

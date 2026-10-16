@@ -33,6 +33,7 @@ public sealed class K2Mod(CustomItemService customItems, TemplateTable templates
     const string HandguardScopeSlotId = "d22000000000000000000101";
     const string Peacekeeper = "5935c25fb3acc3127c3d8cd9";
     const string DefaultInventory = "55d7217a4bdc2d86028b456d";
+    const string M4A1 = "5447a9cd4bdc2dbd208b4567";
 
     public Task OnLoadAsync(CancellationToken cancellationToken)
     {
@@ -72,7 +73,7 @@ public sealed class K2Mod(CustomItemService customItems, TemplateTable templates
         handguardScope.Id = new MongoId(HandguardScopeSlotId);
         handguardScope.Parent = new MongoId(Handguard);
 
-        KeepSlots(Weapon, "mod_magazine", "mod_reciever", "mod_stock");      // 도너 SCAR-L 기준 — 권총손잡이 일체형, 장전손잡이는 K2 노리쇠 메시에 포함
+        KeepSlots(Weapon, "mod_magazine", "mod_reciever", "mod_stock");      // 도너 AK-101 기준(0.4.0) — 가스블록·소염기·총열은 K2 상부 쪽, 권총손잡이·장전손잡이는 K2 메시에 포함
         KeepSlots(Upper, "mod_barrel", "mod_handguard");                     // 가늠자 일체형, 레일은 핸드가드 쪽
         KeepSlots(Barrel, "mod_muzzle");                                     // 가스블록·가늠쇠 일체형, 유탄발사기는 아직 없음
         KeepSlots(Handguard);                                                // M4 하부 핸드가드 칸 제거
@@ -81,7 +82,10 @@ public sealed class K2Mod(CustomItemService customItems, TemplateTable templates
 
         AllowOnly(Weapon, "mod_reciever", Upper);
         AllowOnly(Weapon, "mod_stock", Stock);
-        AllowAlso(Weapon, "mod_magazine", Magazine);                        // STANAG 호환 — 기존 M4 탄창도 그대로 허용
+        // 탄창: AK 탄창이 아니라 K2 탄창 + STANAG(M4A1이 받는 탄창 목록) — K2는 STANAG 호환
+        AllowOnly(Weapon, "mod_magazine", Magazine);
+        foreach (var f in FindSlot(M4A1, "mod_magazine").Properties!.Filters!)
+            foreach (var id in f.Filter!) AllowAlso(Weapon, "mod_magazine", id.ToString());
         AllowOnly(Upper, "mod_barrel", Barrel);
         AllowOnly(Upper, "mod_handguard", Handguard);
         AllowAlso(Barrel, "mod_muzzle", Muzzle);                            // 5.56 AR 소염기·소음기 어댑터도 허용

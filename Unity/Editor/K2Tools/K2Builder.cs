@@ -188,11 +188,12 @@ namespace K2Tools
                     // 조준선 보정: 조준 카메라(애니메이션 노드라 못 옮김) 높이에 K2 가늠자 구멍 중심이 오도록 K2 전체를 올린다
                     // (all-v006 조준 시점 렌더에서 구멍 중심이 약 8mm 아래 — 인게임 "조준선 이상" 증상, 8.3mm 시험 후 7.5mm로)
                     offset.y += SightDy;
+                    if (float.TryParse(Arg("-k2Forward"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var forward)) offset.z += forward;
                     L($"조준선 보정 {SightDy * 1000:+0.0;-0.0} mm");
                     // K2 장전손잡이(노리쇠 메시에서 옆으로 튀어나온 부분) ↔ AK mod_charge(손이 잡는 곳)
                     var boltMesh = parts["bolt_carrier"].GetComponent<MeshFilter>().sharedMesh; var bv = boltMesh.vertices;
-                    float cx = boltMesh.bounds.center.x;
-                    var side = bv.Where(v => Mathf.Abs(v.x - cx) > 0.018f).ToArray();
+                    float cx = 0f;
+                    var side = bv.Where(v => v.x - cx > 0.018f).Distinct().ToArray();
                     var charge = weapon.Find("weapon_bolt/mod_charge");
                     if (side.Length > 0 && charge)
                     {
@@ -377,3 +378,4 @@ namespace K2Tools
         }
     }
 }
+

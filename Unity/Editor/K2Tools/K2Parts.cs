@@ -59,7 +59,7 @@ namespace K2Tools
                 Directory.CreateDirectory(outDir);
 
                 ConfigureImports();
-                var fbx = AssetDatabase.LoadAssetAtPath<GameObject>(SRC + "k2_parts.fbx");
+                var fbx = PrepareSource();
                 var parts = fbx.GetComponentsInChildren<MeshFilter>(true).ToDictionary(m => m.name.Replace("daewoo_K2_", ""), m => m.transform);
                 var mats = MakeMaterials(parts);
                 Directory.CreateDirectory(OUT);
@@ -344,3 +344,4 @@ namespace K2Tools
         }
     }
 }
+
