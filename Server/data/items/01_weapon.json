@@ -1,0 +1,26 @@
+{
+  "newId": "d22000000000000000000001",
+  "itemTplToClone": "5447a9cd4bdc2dbd208b4567",
+  "parentId": "5447b5f14bdc2d61278b4567",
+  "newItemName": "weapon_daewoo_k2_556x45",
+  "handbookParentId": "5b5f78fc86f77409407a7f90",
+  "handbookPriceRoubles": 45000,
+  "fleaPriceRoubles": 45000,
+  "overrideProperties": {
+    "ExaminedByDefault": true,
+    "CanSellOnRagfair": false,
+    "bFirerate": 750
+  },
+  "locales": {
+    "en": {
+      "name": "Daewoo K2 5.56x45 assault rifle",
+      "shortName": "K2",
+      "description": "South Korean 5.56x45 assault rifle with a gas piston system and a side-folding stock."
+    },
+    "kr": {
+      "name": "대우정밀 K2 5.56x45 돌격소총",
+      "shortName": "K2",
+      "description": "가스 피스톤식 국산 5.56x45 돌격소총입니다. 측면 접철식 개머리판을 씁니다."
+    }
+  }
+}

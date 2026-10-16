@@ -1,0 +1,25 @@
+{
+  "newId": "d22000000000000000000016",
+  "itemTplToClone": "55d4887d4bdc2d962f8b4570",
+  "parentId": "5448bc234bdc2d3c308b4569",
+  "newItemName": "mag_stanag_daewoo_k2_std_556x45_30",
+  "handbookParentId": "5b5f754a86f774094242f19b",
+  "handbookPriceRoubles": 2200,
+  "fleaPriceRoubles": 2200,
+  "overrideProperties": {
+    "ExaminedByDefault": true,
+    "CanSellOnRagfair": false
+  },
+  "locales": {
+    "en": {
+      "name": "Daewoo K2 5.56x45 30-round magazine",
+      "shortName": "K2 30",
+      "description": "STANAG-compatible 30-round magazine for the K2 rifle."
+    },
+    "kr": {
+      "name": "대우정밀 K2 5.56x45 30발 탄창",
+      "shortName": "K2 30발",
+      "description": "STANAG 호환 K2용 30발 탄창입니다."
+    }
+  }
+}

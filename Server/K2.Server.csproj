@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- SPT 4.1 서버 모드. 구성은 K2-Project(2026-09-21 실제 dotnet build 성공)와 Cluade_For_spt kb 00·05 표준을 따른다.
+       빌드 결과 폴더(bin/<구성>/net10.0)가 그대로 모드 폴더 모양이 되도록 data/·bundles.json·bundles/를 같이 복사한다.
+       게임 폴더로 자동 배포하지 않는다 — 설치는 사용자가 Package-Mod.ps1 결과 폴더를 직접 복사한다. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>K2Original</RootNamespace>
+    <AssemblyName>K2.Server</AssemblyName>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 서버가 이미 가진 어셈블리라 출력에 복사하지 않는다(Private=false 효과) -->
+    <PackageReference Include="SPTushonka.Common" Version="4.1.*" ExcludeAssets="runtime" />
+    <PackageReference Include="SPTushonka.DI" Version="4.1.*" ExcludeAssets="runtime" />
+    <PackageReference Include="SPTushonka.Reflection" Version="4.1.*" ExcludeAssets="runtime" />
+    <PackageReference Include="SPTushonka.Server.Core" Version="4.1.*" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="data\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="bundles.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="bundles\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

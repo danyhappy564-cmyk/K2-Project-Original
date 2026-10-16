@@ -1,0 +1,25 @@
+{
+  "newId": "d22000000000000000000015",
+  "itemTplToClone": "5a9eb32da2750c00171b3f9c",
+  "parentId": "55818a594bdc2db9688b456a",
+  "newItemName": "stock_daewoo_k2_std",
+  "handbookParentId": "5b5f757486f774093e6cb507",
+  "handbookPriceRoubles": 9000,
+  "fleaPriceRoubles": 9000,
+  "overrideProperties": {
+    "ExaminedByDefault": true,
+    "CanSellOnRagfair": false
+  },
+  "locales": {
+    "en": {
+      "name": "Daewoo K2 stock",
+      "shortName": "K2 stock",
+      "description": "Standard polymer stock for the K2 rifle."
+    },
+    "kr": {
+      "name": "대우정밀 K2 개머리판",
+      "shortName": "K2 개머리판",
+      "description": "K2 소총의 기본 폴리머 개머리판입니다."
+    }
+  }
+}

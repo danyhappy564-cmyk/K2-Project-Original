@@ -1,0 +1,25 @@
+{
+  "newId": "d22000000000000000000014",
+  "itemTplToClone": "544a38634bdc2d58388b4568",
+  "parentId": "550aa4bf4bdc2dd6348b456b",
+  "newItemName": "muzzle_daewoo_k2_std_556x45",
+  "handbookParentId": "5b5f724c86f774093f2ecf15",
+  "handbookPriceRoubles": 1500,
+  "fleaPriceRoubles": 1500,
+  "overrideProperties": {
+    "ExaminedByDefault": true,
+    "CanSellOnRagfair": false
+  },
+  "locales": {
+    "en": {
+      "name": "Daewoo K2 5.56x45 flash hider",
+      "shortName": "K2 FH",
+      "description": "Standard flash hider for the K2 rifle."
+    },
+    "kr": {
+      "name": "대우정밀 K2 5.56x45 소염기",
+      "shortName": "K2 소염기",
+      "description": "K2 소총의 기본 소염기입니다."
+    }
+  }
+}

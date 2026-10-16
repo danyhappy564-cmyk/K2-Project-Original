@@ -1,0 +1,67 @@
+{
+  "manifest": [
+    {
+      "key": "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
+      "dependencyKeys": [
+        "shaders",
+        "cubemaps"
+      ]
+    },
+    {
+      "key": "assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle",
+      "dependencyKeys": [
+        "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
+        "shaders",
+        "cubemaps"
+      ]
+    },
+    {
+      "key": "assets/content/items/mods/recievers/reciever_daewoo_k2_std.bundle",
+      "dependencyKeys": [
+        "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
+        "shaders",
+        "cubemaps"
+      ]
+    },
+    {
+      "key": "assets/content/items/mods/barrels/barrel_daewoo_k2_465mm.bundle",
+      "dependencyKeys": [
+        "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
+        "shaders",
+        "cubemaps"
+      ]
+    },
+    {
+      "key": "assets/content/items/mods/handguards/handguard_daewoo_k2_mits_long.bundle",
+      "dependencyKeys": [
+        "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
+        "shaders",
+        "cubemaps"
+      ]
+    },
+    {
+      "key": "assets/content/items/mods/muzzle/muzzle_daewoo_k2_std_556x45.bundle",
+      "dependencyKeys": [
+        "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
+        "shaders",
+        "cubemaps"
+      ]
+    },
+    {
+      "key": "assets/content/items/mods/stocks/stock_daewoo_k2_std.bundle",
+      "dependencyKeys": [
+        "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
+        "shaders",
+        "cubemaps"
+      ]
+    },
+    {
+      "key": "assets/content/items/mods/magazines/mag_stanag_daewoo_k2_std_556x45_30.bundle",
+      "dependencyKeys": [
+        "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
+        "shaders",
+        "cubemaps"
+      ]
+    }
+  ]
+}

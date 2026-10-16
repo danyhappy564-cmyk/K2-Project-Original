@@ -1,0 +1,25 @@
+{
+  "newId": "d22000000000000000000012",
+  "itemTplToClone": "55d3632e4bdc2d972f8b4569",
+  "parentId": "555ef6e44bdc2de9068b457e",
+  "newItemName": "barrel_daewoo_k2_465mm",
+  "handbookParentId": "5b5f75c686f774094242f19f",
+  "handbookPriceRoubles": 26000,
+  "fleaPriceRoubles": 26000,
+  "overrideProperties": {
+    "ExaminedByDefault": true,
+    "CanSellOnRagfair": false
+  },
+  "locales": {
+    "en": {
+      "name": "Daewoo K2 465mm 5.56x45 barrel",
+      "shortName": "K2 465mm",
+      "description": "465mm K2 barrel with an integrated gas block and front sight."
+    },
+    "kr": {
+      "name": "대우정밀 K2 465mm 5.56x45 총열",
+      "shortName": "K2 465mm",
+      "description": "가스블록과 가늠쇠가 일체형인 K2 465mm 총열입니다."
+    }
+  }
+}

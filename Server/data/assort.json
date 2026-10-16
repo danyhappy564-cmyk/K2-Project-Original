@@ -1,0 +1,184 @@
+{
+  "barter_scheme": {
+    "d22000000000000000000300": [
+      [
+        {
+          "count": 620,
+          "_tpl": "5696686a4bdc2da3298b456a"
+        }
+      ]
+    ],
+    "d22000000000000000000400": [
+      [
+        {
+          "count": 70,
+          "_tpl": "5696686a4bdc2da3298b456a"
+        }
+      ]
+    ],
+    "d22000000000000000000401": [
+      [
+        {
+          "count": 190,
+          "_tpl": "5696686a4bdc2da3298b456a"
+        }
+      ]
+    ],
+    "d22000000000000000000402": [
+      [
+        {
+          "count": 95,
+          "_tpl": "5696686a4bdc2da3298b456a"
+        }
+      ]
+    ],
+    "d22000000000000000000403": [
+      [
+        {
+          "count": 12,
+          "_tpl": "5696686a4bdc2da3298b456a"
+        }
+      ]
+    ],
+    "d22000000000000000000404": [
+      [
+        {
+          "count": 70,
+          "_tpl": "5696686a4bdc2da3298b456a"
+        }
+      ]
+    ],
+    "d22000000000000000000405": [
+      [
+        {
+          "count": 18,
+          "_tpl": "5696686a4bdc2da3298b456a"
+        }
+      ]
+    ]
+  },
+  "items": [
+    {
+      "_id": "d22000000000000000000300",
+      "_tpl": "d22000000000000000000001",
+      "parentId": "hideout",
+      "slotId": "hideout",
+      "upd": {
+        "Repairable": {
+          "Durability": 100,
+          "MaxDurability": 100
+        },
+        "FireMode": {
+          "FireMode": "single"
+        },
+        "StackObjectsCount": 9999,
+        "UnlimitedCount": true
+      }
+    },
+    {
+      "_id": "d22000000000000000000301",
+      "_tpl": "d22000000000000000000011",
+      "parentId": "d22000000000000000000300",
+      "slotId": "mod_reciever"
+    },
+    {
+      "_id": "d22000000000000000000302",
+      "_tpl": "d22000000000000000000012",
+      "parentId": "d22000000000000000000301",
+      "slotId": "mod_barrel"
+    },
+    {
+      "_id": "d22000000000000000000303",
+      "_tpl": "d22000000000000000000014",
+      "parentId": "d22000000000000000000302",
+      "slotId": "mod_muzzle"
+    },
+    {
+      "_id": "d22000000000000000000304",
+      "_tpl": "d22000000000000000000013",
+      "parentId": "d22000000000000000000301",
+      "slotId": "mod_handguard"
+    },
+    {
+      "_id": "d22000000000000000000305",
+      "_tpl": "d22000000000000000000015",
+      "parentId": "d22000000000000000000300",
+      "slotId": "mod_stock"
+    },
+    {
+      "_id": "d22000000000000000000306",
+      "_tpl": "d22000000000000000000016",
+      "parentId": "d22000000000000000000300",
+      "slotId": "mod_magazine"
+    },
+    {
+      "_id": "d22000000000000000000400",
+      "_tpl": "d22000000000000000000011",
+      "parentId": "hideout",
+      "slotId": "hideout",
+      "upd": {
+        "StackObjectsCount": 9999,
+        "UnlimitedCount": true
+      }
+    },
+    {
+      "_id": "d22000000000000000000401",
+      "_tpl": "d22000000000000000000012",
+      "parentId": "hideout",
+      "slotId": "hideout",
+      "upd": {
+        "StackObjectsCount": 9999,
+        "UnlimitedCount": true
+      }
+    },
+    {
+      "_id": "d22000000000000000000402",
+      "_tpl": "d22000000000000000000013",
+      "parentId": "hideout",
+      "slotId": "hideout",
+      "upd": {
+        "StackObjectsCount": 9999,
+        "UnlimitedCount": true
+      }
+    },
+    {
+      "_id": "d22000000000000000000403",
+      "_tpl": "d22000000000000000000014",
+      "parentId": "hideout",
+      "slotId": "hideout",
+      "upd": {
+        "StackObjectsCount": 9999,
+        "UnlimitedCount": true
+      }
+    },
+    {
+      "_id": "d22000000000000000000404",
+      "_tpl": "d22000000000000000000015",
+      "parentId": "hideout",
+      "slotId": "hideout",
+      "upd": {
+        "StackObjectsCount": 9999,
+        "UnlimitedCount": true
+      }
+    },
+    {
+      "_id": "d22000000000000000000405",
+      "_tpl": "d22000000000000000000016",
+      "parentId": "hideout",
+      "slotId": "hideout",
+      "upd": {
+        "StackObjectsCount": 9999,
+        "UnlimitedCount": true
+      }
+    }
+  ],
+  "loyal_level_items": {
+    "d22000000000000000000300": 1,
+    "d22000000000000000000400": 1,
+    "d22000000000000000000401": 1,
+    "d22000000000000000000402": 1,
+    "d22000000000000000000403": 1,
+    "d22000000000000000000404": 1,
+    "d22000000000000000000405": 1
+  }
+}
