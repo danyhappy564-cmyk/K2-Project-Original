@@ -67,7 +67,9 @@ for key, own_deps in ours.items():
     for d in dict.fromkeys(candidates):
         p = os.path.join(root, d) if d in ours else os.path.join(game, d)
         cabs = cab_of_file(p) if os.path.isfile(p) else set()
-        if d in own_deps or d in ("shaders", "cubemaps") or (cabs & needed):
+        # 컨테이너는 도너의 의존을 전부 넣는다(0.8.0): 컨트롤러가 다른 번들(additional_hands·weapon_root_anim_fix·simple/spirit 애니메이션)의
+        # 클립을 참조하는데, 직접 참조만 남기면 그 번들이 안 불려 애니메이터가 비었다(인게임 팔 펴짐·총 떠 있음, errors.log layerCount 0)
+        if d in own_deps or d in ("shaders", "cubemaps") or (cabs & needed) or (key in TEMPLATE and key.endswith("_container.bundle")):
             deps.append(d); have |= cabs
     missing = sorted(needed - have)
     if missing:
