@@ -20,6 +20,8 @@ namespace K2Tools
         const string M4P = "Assets/K2Ripped/M4Parts/Content/Items/Mods/";
         const string MODS = "Assets/Content/Items/Mods/";
         const string SHARED_BUNDLE = "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle";
+        const string PLACEHOLDER_SHADERS = "shaders";
+        const string SHADER_ASSET = "Assets/Shaders/Bumped Specular SMap.shader";
 
         class Part
         {
@@ -38,6 +40,9 @@ namespace K2Tools
             new Part { Id = "stock", Template = "stocks/stock_ar15_colt_stock_tube_std", Folder = "stocks", Name = "stock_daewoo_k2_std", Mesh = "stock", Parent = "body", Slot = "mod_stock" },
             new Part { Id = "magazine", Template = "magazines/mag_stanag_colt_ar15_std_556x45_30", Folder = "magazines", Name = "mag_stanag_daewoo_k2_std_556x45_30", Mesh = "magazine", Parent = "body", Slot = "mod_magazine" },
         };
+
+        // 게임이 부품을 슬롯에 붙일 때 더하는 회전(바닐라 M4 조립 실험으로 확인)
+        public static readonly Matrix4x4 AttachRot = Matrix4x4.Rotate(Quaternion.Euler(90, 0, 0));
 
         static Matrix4x4 Rel(Transform root, Transform t) => root.worldToLocalMatrix * t.localToWorldMatrix;
         static Transform FindDeep(Transform r, string name) => r.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == name);
@@ -99,32 +104,26 @@ namespace K2Tools
                 // 2. 부품
                 foreach (var d in PartDefs)
                 {
-                    d.S = slotMatrix[d.Parent + "/" + d.Slot];
+                    // 게임 부착 규칙: 부품 루트 = 슬롯 × X축 +90° (바닐라 M4를 세 규칙으로 조립해 확인 — K2Check.AttachRuleTest, all-v003)
+                    d.S = slotMatrix[d.Parent + "/" + d.Slot] * AttachRot;
                     var path = Copy(M4P + d.Template + ".prefab", d.PrefabPath);
                     var root = PrefabUtility.LoadPrefabContents(path);
                     try
                     {
                         root.name = d.Name;
                         var r = root.transform; var Sinv = d.S.inverse;
-                        void Put(Transform t, Vector3 bodyPos, Quaternion? bodyRot = null)
+                        // 노드 위치만 본체 공간 목표로 옮기고 회전은 템플릿 그대로(게임 규칙이 템플릿 회전을 전제로 한다)
+                        void Put(Transform t, Vector3 bodyPos)
                         {
-                            if (t.parent != r) t.SetParent(r, false);
-                            var m = Sinv * Matrix4x4.TRS(bodyPos, bodyRot ?? Quaternion.identity, Vector3.one);
-                            t.localPosition = m.GetColumn(3); t.localRotation = m.rotation; t.localScale = Vector3.one;
+                            var parentM = d.S * (r.worldToLocalMatrix * t.parent.localToWorldMatrix);
+                            t.localPosition = parentM.inverse.MultiplyPoint3x4(bodyPos);
                         }
-                        void PutMatrix(Transform t, Matrix4x4 bodyM)
-                        {
-                            if (t.parent != r) t.SetParent(r, false);
-                            var m = Sinv * bodyM;
-                            t.localPosition = m.GetColumn(3); t.localRotation = m.rotation;
-                        }
-                        ReplaceMeshes(r, d, parts, mats, Put, BodyPos(d.Mesh));
+                        ReplaceMeshes(r, d, parts, mats, BodyPos(d.Mesh));
 
                         switch (d.Id)
                         {
                             case "upper":
-                                Put(FindDeep(r, "mod_barrel"), BodyPos("barrel_long"));
-                                Put(FindDeep(r, "mod_handguard"), BodyPos("handguard_long"));
+                                // mod_barrel·mod_handguard는 템플릿 위치 그대로 — 총열·핸드가드 메시를 그 슬롯 기준으로 변환한다
                                 // K2 상부엔 가늠자가 붙어 있고 레일은 핸드가드 쪽 — 상부의 조준경·가늠자 슬롯은 뺀다
                                 foreach (var n in new[] { "mod_scope", "mod_sight_rear" }) { var t = FindDeep(r, n); if (t) UnityEngine.Object.DestroyImmediate(t.gameObject); }
                                 break;
@@ -141,17 +140,12 @@ namespace K2Tools
                             }
                             case "handguard":
                             {
-                                // 왼손 그립 자세: M4A1 조립 때의 본체 공간 위치를 유지
-                                var m4Hg = AssetDatabase.LoadAssetAtPath<GameObject>(M4P + d.Template + ".prefab").transform;
-                                foreach (var gp in r.GetComponentsInChildren<Transform>(true).Where(t => t.name.StartsWith("Base HumanLPalm")).ToArray())
-                                {
-                                    var src = FindDeep(m4Hg, gp.name);
-                                    PutMatrix(gp, m4HandguardSlot * Rel(m4Hg, src));
-                                }
+                                // 왼손 그립 자세(Base HumanLPalm)는 템플릿 그대로 — 핸드가드 루트가 바닐라 슬롯에 붙으므로 M4A1과 같은 손 위치
                                 var sub = r.Cast<Transform>().FirstOrDefault(t => t.name == "mod_handguard"); if (sub) UnityEngine.Object.DestroyImmediate(sub.gameObject);
                                 // 레일 윗면에 조준경 슬롯 — 앞뒤 위치는 M4A1 조준경 슬롯(상부 위)과 같게, 레일 범위 안으로
                                 var b = BodyBounds("handguard_long");
                                 var scope = new GameObject("mod_scope").transform;
+                                scope.SetParent(r, false); scope.localRotation = Quaternion.Euler(270, 0, 0);   // 바닐라 슬롯과 같은 방향(상부 LOD0 X 270 아래 회전 0)
                                 float z = Mathf.Clamp(m4ScopeSlot.GetColumn(3).z, b.min.z + 0.03f, b.max.z - 0.03f);
                                 // 높이는 레일 윗면 그대로(all-v001에서 M4A1 레일 대비 계산은 -64mm로 총 안쪽에 들어가 폐기 — 참고 로그만 남김)
                                 Put(scope, new Vector3(boreX, b.max.y, z));
@@ -162,7 +156,7 @@ namespace K2Tools
                             {
                                 var b = BodyBounds("muzzle"); var front = new Vector3(boreX, boreY, b.max.z);
                                 var mf0 = FindDeep(r, "muzzleflash_000");
-                                var want = (Vector3)(Sinv * Matrix4x4.Translate(front)).GetColumn(3);
+                                var want = Sinv.MultiplyPoint3x4(front);
                                 var delta = mf0 ? want - mf0.localPosition : Vector3.zero;
                                 foreach (var t in r.GetComponentsInChildren<Transform>(true).Where(t => t.name.StartsWith("muzzleflash_")))
                                     if (t.parent == r) t.localPosition += delta;
@@ -196,6 +190,9 @@ namespace K2Tools
                     new AssetBundleBuild { assetBundleName = BUNDLE, assetNames = new[] { containerPath } },
                 };
                 builds.AddRange(PartDefs.Select(d => new AssetBundleBuild { assetBundleName = d.Bundle, assetNames = new[] { d.PrefabPath } }));
+                // 셰이더는 번들에 넣지 않고 외부("shaders") 참조로 만든다 — 빌드 뒤 tools/fix_shader_refs.py가 게임 shaders 번들의
+                // 진짜 셰이더 ID로 바꾼다. 이 "shaders" 번들 자체는 배포하지 않는다(1차 인게임에서 내장 SDK 셰이더는 흰색·회색으로 보임, all-v003).
+                builds.Add(new AssetBundleBuild { assetBundleName = PLACEHOLDER_SHADERS, assetNames = new[] { SHADER_ASSET } });
                 var manifest = BuildPipeline.BuildAssetBundles(outDir, builds.ToArray(), BuildAssetBundleOptions.ChunkBasedCompression, BuildTarget.StandaloneWindows64);
                 if (manifest == null) throw new Exception("번들 빌드 실패");
                 VerifyAll(outDir, manifest, builds);
@@ -213,22 +210,25 @@ namespace K2Tools
         }
 
         // 템플릿의 메시 노드를 K2 메시 하나로 바꾼다: LOD0·LOD1 첫 노드만 남기고 나머지 메시 노드는 지운다.
-        // 메시 노드 아래 붙어 있던 슬롯(mod_ 등)은 먼저 루트로 옮겨 메시 노드를 움직여도 따라가지 않게 한다.
-        static void ReplaceMeshes(Transform r, Part d, Dictionary<string, Transform> parts, Dictionary<string, Material> mats,
-            Action<Transform, Vector3, Quaternion?> put, Vector3 bodyPos)
+        // 노드 위치·회전은 템플릿 그대로 두고, K2 메시를 그 노드 기준으로 변환(bake)한다(all-v003).
+        static void ReplaceMeshes(Transform r, Part d, Dictionary<string, Transform> parts, Dictionary<string, Material> mats, Vector3 bodyPos)
         {
             var meshNodes = r.GetComponentsInChildren<Transform>(true).Where(t => t.GetComponent<MeshFilter>() || (t.GetComponent<BoxCollider>() && t.name.Contains("_LOD"))).ToList();
-            foreach (var n in meshNodes)
-                foreach (var c in n.Cast<Transform>().Where(c => !meshNodes.Contains(c)).ToArray()) c.SetParent(r, true);
             var lod0 = meshNodes.FirstOrDefault(t => !t.name.Contains("LOD1"));
             var lod1 = meshNodes.FirstOrDefault(t => t.name.Contains("LOD1"));
-            foreach (var n in meshNodes.Where(t => t != lod0 && t != lod1).ToArray()) UnityEngine.Object.DestroyImmediate(n.gameObject);
-            var src = parts[d.Mesh]; var mesh = src.GetComponent<MeshFilter>().sharedMesh;
+            foreach (var n in meshNodes.Where(t => t != lod0 && t != lod1).ToArray())
+            {
+                // 지울 메시 노드 아래 슬롯 등이 있으면 먼저 루트로 옮겨 살린다(위치·회전 유지)
+                foreach (var c in n.Cast<Transform>().ToArray()) c.SetParent(r, true);
+                UnityEngine.Object.DestroyImmediate(n.gameObject);
+            }
+            var src = parts[d.Mesh]; var srcMesh = src.GetComponent<MeshFilter>().sharedMesh;
             foreach (var (n, suffix) in new[] { (lod0, "_LOD0"), (lod1, "_LOD1") })
             {
                 if (!n) continue;
                 n.name = d.Name + suffix;
-                put(n, bodyPos, null);
+                var nodeM = d.S * (r.worldToLocalMatrix * n.localToWorldMatrix);
+                var mesh = Bake(srcMesh, nodeM.inverse * Matrix4x4.Translate(bodyPos), d.Name + suffix);
                 var mf = n.GetComponent<MeshFilter>(); if (mf) mf.sharedMesh = mesh;
                 var mr = n.GetComponent<MeshRenderer>(); if (mr) mr.sharedMaterials = MatsFor(src, mats);
                 var bc = n.GetComponent<BoxCollider>(); if (bc) { bc.center = mesh.bounds.center; bc.size = mesh.bounds.size; }
@@ -252,11 +252,11 @@ namespace K2Tools
             try
             {
                 bool first = true;
-                foreach (var b in builds)
+                foreach (var b in builds.Where(x => x.assetBundleName != PLACEHOLDER_SHADERS))
                 {
                     var file = Path.Combine(outDir, b.assetBundleName);
                     var size = new FileInfo(file).Length / 1048576.0;
-                    var deps = manifest.GetAllDependencies(b.assetBundleName);
+                    var deps = manifest.GetAllDependencies(b.assetBundleName).Where(x => x != PLACEHOLDER_SHADERS).ToArray();
                     string detail = "";
                     if (b.assetBundleName != SHARED_BUNDLE)
                     {
@@ -297,6 +297,7 @@ namespace K2Tools
                 var parent = placed[d.Parent];
                 var slot = FindDeep(parent, d.Slot);
                 var go = (GameObject)UnityEngine.Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(d.PrefabPath), slot, false);
+                go.transform.localPosition = Vector3.zero; go.transform.localRotation = Quaternion.Euler(90, 0, 0);   // 게임 부착 규칙
                 placed[d.Id] = go.transform; all.Add(go);
             }
             var std = Shader.Find("Standard");

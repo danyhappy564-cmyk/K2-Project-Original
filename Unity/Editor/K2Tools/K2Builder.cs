@@ -118,7 +118,7 @@ namespace K2Tools
             mi.globalScale = 1; mi.useFileScale = true; mi.bakeAxisConversion = false;
             mi.importAnimation = false; mi.animationType = ModelImporterAnimationType.None;
             mi.materialImportMode = ModelImporterMaterialImportMode.ImportViaMaterialDescription;   // 재질 이름(슬롯 순서)을 읽기 위해서만
-            mi.importTangents = ModelImporterTangents.CalculateMikk; mi.isReadable = false;
+            mi.importTangents = ModelImporterTangents.CalculateMikk; mi.isReadable = true;   // Bake가 정점을 읽는다
             mi.SaveAndReimport();
             foreach (var png in Directory.GetFiles(SRC + "Textures", "*.png"))
             {
@@ -185,12 +185,13 @@ namespace K2Tools
                     }
                 }
                 var off = offset;
+                // 노드(위치·회전)는 템플릿 그대로 두고, K2 메시를 그 노드 기준으로 미리 변환해 넣는다(bake).
+                // 1차 인게임(all-v002)에서 노드 회전을 바꿨더니 애니메이션이 원래 회전을 다시 써서 노리쇠가 90° 꺾였다.
                 void Place(Transform t, string part)
                 {
                     var src = parts[part];
-                    t.position = root.transform.TransformPoint(src.localPosition + off);
-                    t.rotation = root.transform.rotation;
-                    var mesh = src.GetComponent<MeshFilter>().sharedMesh;
+                    var nodeM = root.transform.worldToLocalMatrix * t.localToWorldMatrix;   // 본체 공간에서 노드 행렬
+                    var mesh = Bake(src.GetComponent<MeshFilter>().sharedMesh, nodeM.inverse * Matrix4x4.Translate(src.localPosition + off), $"{rootName}_{t.name}");
                     var mf = t.GetComponent<MeshFilter>(); var mr = t.GetComponent<MeshRenderer>();
                     if (mf) mf.sharedMesh = mesh;
                     if (mr) mr.sharedMaterials = MatsFor(src, mats);
@@ -204,7 +205,7 @@ namespace K2Tools
                 {
                     var n = weapon.Find(node);
                     if (!n) { L($"  {rootName}: 노드 없음 {node} — 건너뜀"); continue; }
-                    // 메시가 노드 자신에 있거나(본체 LOD) 자식에 있다(움직이는 부품 — 노드는 애니메이션용이라 그대로 둔다).
+                    // 메시가 노드 자신에 있거나(본체 LOD) 자식에 있다(움직이는 부품).
                     var targets = n.GetComponent<MeshFilter>() || n.GetComponent<BoxCollider>() ? new[] { n }
                         : n.Cast<Transform>().Where(c => c.GetComponent<MeshFilter>() || c.GetComponent<BoxCollider>()).ToArray();
                     foreach (var t in targets) Place(t, part);
@@ -214,19 +215,13 @@ namespace K2Tools
                 {
                     var p = parent == "" ? weapon : weapon.Find(parent);
                     var go = new GameObject(part + "_LOD0");
-                    go.transform.SetParent(p, false);
+                    go.transform.SetParent(p, false);   // 위치·회전 0 — 메시를 이 기준으로 변환
                     go.AddComponent<MeshFilter>(); go.AddComponent<MeshRenderer>();
                     Place(go.transform, part);
                     lod0Extra.Add(go.GetComponent<MeshRenderer>());
                     L($"  {rootName}: 추가 {part} (부모 {(parent == "" ? "weapon" : parent)})");
                 }
-                // 애니메이션이 움직이지 않는 슬롯은 K2 부품 위치로 옮긴다(부품 번들이 이 위치에 붙는다) — 3단계 parts-v001
-                foreach (var (slot, part) in new[] { ("mod_reciever", "upper"), ("mod_stock", "stock") })
-                {
-                    var s = weapon.Find(slot);
-                    s.position = root.transform.TransformPoint(parts[part].localPosition + off);
-                    s.rotation = root.transform.rotation;
-                }
+                // 본체 슬롯(mod_reciever·mod_stock·mod_magazine)은 템플릿 위치 그대로 — 부품 메시를 슬롯 기준으로 변환한다(all-v003)
                 if (lod)
                 {
                     var lods = lod.GetLODs();
@@ -236,6 +231,23 @@ namespace K2Tools
                 PrefabUtility.SaveAsPrefabAsset(root, path);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        // 메시 복사본을 행렬 m(강체 변환)으로 옮겨 에셋으로 저장. 원본 FBX 메시는 그대로.
+        public static Mesh Bake(Mesh src, Matrix4x4 m, string name)
+        {
+            var mesh = UnityEngine.Object.Instantiate(src); mesh.name = name;
+            var v = mesh.vertices; var n = mesh.normals; var t = mesh.tangents;
+            for (int i = 0; i < v.Length; i++) v[i] = m.MultiplyPoint3x4(v[i]);
+            for (int i = 0; i < n.Length; i++) n[i] = m.MultiplyVector(n[i]).normalized;
+            for (int i = 0; i < t.Length; i++) { var d = m.MultiplyVector(new Vector3(t[i].x, t[i].y, t[i].z)).normalized; t[i] = new Vector4(d.x, d.y, d.z, t[i].w); }
+            mesh.vertices = v; mesh.normals = n; mesh.tangents = t; mesh.RecalculateBounds();
+            mesh.UploadMeshData(false);
+            var dir = OUT + "Meshes/"; Directory.CreateDirectory(dir);
+            var path = dir + name.Replace(' ', '_') + ".asset";
+            if (AssetDatabase.LoadAssetAtPath<Mesh>(path)) AssetDatabase.DeleteAsset(path);
+            AssetDatabase.CreateAsset(mesh, path);
+            return mesh;
         }
 
         static void EditContainer(string path, string modelPath, string simplePath)
