@@ -6,12 +6,13 @@
 - 장전손잡이: 오른손이 mod_charge를 만지는 10개 클립 IK(K2AnimBakeCharge, 거리 기반 비중) + charge_2 왼손(Codex bake-ak-v003).
 - 오른쪽 접기: 회전 축 = K2 실제 경첩 핀(HINGE). mod_stock 위치 x → −x + a, y + b, z + c(모든 클립), 접기 클립 오일러 y·z 반전,
   개머리판 메시 −HINGE(mirror_parts), 컨테이너 mod_stock 기본값도 같은 변환.
-- 접기 손: AK 왼손은 왼쪽으로 미는 동작이라 반대 — 접기 클립의 왼팔·손가락을 처음 자세로 고정.
-- 조정간: firemode 클립의 오른팔(쇄골~손바닥·마커)을 처음 자세로 고정 — 손가락만 움직임(AK 오른쪽 레버로 손이 가지 않게).
+- 접기 손: AK 왼손은 왼쪽으로 미는 동작이라 반대 — 왼팔·손가락은 처음 자세로 고정, 상완·전완1·손바닥은 총을 따라가는 IK(K2AnimBakeFollow, BAKE_L).
+- 조정간: firemode 클립의 오른팔 고정(손가락만) + 총 굴림을 좌우 거울(AK는 오른쪽 레버를, K2는 왼쪽 조정간을 보여 줌).
+- 탄창 넣기: mag_in 클립에서 끼울 자리에 가까울수록 mod_magazine 기울기를 0으로(곧게 밀어 넣음 — K2 탄창이 총 몸을 뚫던 문제).
 - 탄창 칸: mod_magazine·mod_magazine_new +z LIFT(다른 탄창이 K2 탄창 구멍에), K2 전용 탄창 메시는 −LIFT.
 m_ValueArrayDelta(곡선별 시작·끝 값)도 같은 선형 변환으로 맞춘다.
 
-  python tools/build_anim.py <K2 번들 폴더(ak-v010)> <출력 폴더>
+  python tools/build_anim.py <K2 번들 폴더(ak-v014)> <출력 폴더>
 필요: Codex 작업 폴더(코덱스방/K2-anim-v001)의 ak_graph_v003a·ak_curve_fix_v003a·build_ak_anim_v002a 모듈, bake-ak-v003/ik-curves.json,
       BAKE_R(K2AnimBakeCharge 결과). 조립: ak-v010 + 출력 → ak-v013, bundles.json에 override 번들 항목·컨테이너 의존 추가.
 """
@@ -29,7 +30,9 @@ G.SOURCE = SRC
 HINGE = (0.0359, 0.0205)
 LIFT = 0.027   # K2 모델을 올린 양(-k2SightDy 0.011118 − (−0.015882)) — aim_camera·탄창 칸에 같이 더한다
 BAKE_R = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-charge-v001/ik-curves.json'
+BAKE_L = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-fold-v001/ik-curves.json'
 SELECTOR = ('ak100_firemode_0', 'ak100_firemode_1')
+MIRROR_NODES = ('weapon',)   # 조정간 클립에서 좌우 거울로 뒤집는 노드(총 굴림) — K2 조정간은 왼쪽
 R_ARM = {'Base HumanRCollarbone', 'Base HumanRUpperarm', 'Base HumanRForearm1', 'Base HumanRForearm2', 'Base HumanRForearm3', 'Base HumanRPalm',
          'weapon_R_IK_marker', 'weapon_R_hand_marker', 'Bend_Goal_Right'}
 L_ARM = {'Base HumanL*', 'weapon_L_IK_marker', 'weapon_L_hand_marker', 'Bend_Goal_Left'}
@@ -53,6 +56,8 @@ def main():
     baked = {c['name']: c for c in bake['clips'] if c['side'] == 'L'}          # charge_2(왼손 당김)는 Codex 결과
     mine = json.loads(pathlib.Path(BAKE_R).read_text(encoding='utf-8')); assert mine['passed']
     baked.update({c['name']: c for c in mine['clips']})                         # 오른손이 손잡이 만지는 10개(K2AnimBakeCharge)
+    fold = json.loads(pathlib.Path(BAKE_L).read_text(encoding='utf-8')); assert fold['passed']
+    baked.update({c['name']: c for c in fold['clips']})                         # 접기 클립 왼손이 핸드가드를 따라감(K2AnimBakeFollow)
     changed = {}; changes = []
     for data in baked.values():
         for sample in data['frames']:
@@ -102,14 +107,42 @@ def main():
             c = clipdata(t); end = max(t['m_MuscleClip']['m_StopTime'], 0)
             row['foldPosition'] = [[round(eval_scalar(c, pb2['offset'] + j, tm), 5) for j in range(3)] for pb2 in st if pb2['attribute'] == 1 for tm in (0, end)]
         # 조정간(0.9.1): AK 손이 오른쪽 레버로 가는 대신 팔은 제자리, 손가락 움직임만(엄지로 K2 왼쪽 조정간을 돌리는 모양)
-        # 접기(0.9.1): AK 왼손은 왼쪽으로 미는 동작이라 오른쪽 접기와 반대 — 왼팔·손가락은 처음 자세(핸드가드)로 고정
+        # 접기(0.9.2): 왼팔·손가락은 처음 자세로 고정하되 상완·전완1·손바닥은 IK(총을 따라 핸드가드를 계속 잡음 — 0.9.1은 손이 떴다)
+        solved = set()
+        if t['m_Name'] in baked:
+            sd = baked[t['m_Name']]['side']; solved = {'Base Human' + sd + n for n in ('Upperarm', 'Forearm1', 'Palm')}
         for names in ([R_ARM] if t['m_Name'] in SELECTOR else []) + ([L_ARM] if t['m_Name'] in FOLD else []):
             for b in bs:
                 last = b['path'].split('/')[-1]
+                if last in solved and b['attribute'] == 4: continue
                 if last in names or ('Base HumanL*' in names and last.startswith('Base HumanL')):
                     c = clipdata(t)
                     for j in range(b['dim']): lin(t, b['offset'] + j, scale=0, add=eval_scalar(c, b['offset'] + j, 0))
                     row.setdefault('frozen', []).append(last)
+        # 조정간(0.9.2): AK는 총을 굴려 오른쪽 레버를 보여 준다 — K2 조정간은 왼쪽이라 총 움직임을 좌우 거울(위치 x, 회전 y·z 부호)
+        if t['m_Name'] in SELECTOR:
+            for b in bs:
+                if b['path'].split('/')[-1] in MIRROR_NODES:
+                    if b['attribute'] == 1: lin(t, b['offset'], scale=-1); row.setdefault('mirror', []).append('pos')
+                    elif b['attribute'] == 4: lin(t, b['offset'] + 1, scale=-1); lin(t, b['offset'] + 2, scale=-1); row.setdefault('mirror', []).append('rot')
+                    elif b['attribute'] == 2: raise AssertionError('쿼터니언 곡선은 처리 안 함')
+        # 탄창 넣기(0.9.2): AK는 끼울 자리에서 앞으로 ~25° 기울여 걸었다 젖혀 넣는다 — K2 탄창은 회전 중심보다 위로 길어 총 몸을 뚫는다.
+        # 끼울 자리에 가까울수록 기울기를 0으로(1cm 안 = 0, 8cm 밖 = 원래): 곧게 밀어 넣는 STANAG식. 밀집 곡선만(프레임별).
+        if 'mag_in' in t['m_Name']:
+            c = clipdata(t); de = c['m_DenseClip']; ns = c['m_StreamedClip']['curveCount']; nd = de['m_CurveCount']; a = de['m_SampleArray']
+            pos = next((b for b in bs if b['path'].endswith('/mod_magazine') and b['attribute'] == 1), None)
+            rot = next((b for b in bs if b['path'].endswith('/mod_magazine') and b['attribute'] == 4), None)
+            if pos and rot and rot['storage'] == 'dense':
+                seat = [eval_scalar(c, pos['offset'] + j, t['m_MuscleClip']['m_StopTime']) for j in range(3)]   # 끝 = 끼운 자리
+                n = 0
+                for f in range(de['m_FrameCount']):
+                    tm = de['m_BeginTime'] + f / de['m_SampleRate']
+                    pnow = [eval_scalar(c, pos['offset'] + j, tm) for j in range(3)]
+                    d = math.dist(pnow, seat); u = min(1, max(0, (d - 0.01) / 0.07)); w = u * u * (3 - 2 * u)
+                    for j in range(3):
+                        k = f * nd + rot['offset'] - ns + j; a[k] *= w
+                    n += w < 0.999
+                row['magStraight'] = n
         # 탄창 칸(0.9.1): K2를 27mm 올린 만큼 mod_magazine·mod_magazine_new도 무기 +z 27mm(다른 탄창이 K2 탄창 구멍에 맞게).
         # K2 전용 탄창 메시는 −27mm(mag_parts)로 지금 자리 유지.
         for b in bs:

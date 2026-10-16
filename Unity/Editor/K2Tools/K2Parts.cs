@@ -179,7 +179,7 @@ namespace K2Tools
                                 // 조준경 마운트: 0.4.2 인게임 "너무 뒤" — M4A1 기준(리시버 위)에서 리시버 앞끝 16mm 뒤로(사용자 표시 위치)
                                 Slot("mod_scope", 0, new Vector3(boreX, b.max.y, Mathf.Clamp(tubeRear - 0.016f, b.min.z + 0.03f, b.max.z - 0.03f)));
                                 // 0.6.0: 손잡이·레일(M-LOK) — 손잡이는 관 뒤끝 9cm 앞 아래, 옆 레일은 앞에서 10cm, 아래 레일·윗면 전술 장비는 앞쪽
-                                Slot("mod_foregrip", 180, new Vector3(boreX, b.min.y, tubeRear + 0.09f));
+                                Slot("mod_foregrip", 180, new Vector3(boreX, b.min.y, tubeRear + 0.145f));   // 0.9.2: 0.09 → 0.145 — 인게임 "손잡이가 탄창에 너무 가까움"(사용자가 모드로 당긴 자리 실측 약 55mm 앞)
                                 Slot("mod_mount_000", 90, new Vector3(b.min.x, boreY, b.max.z - 0.10f));
                                 Slot("mod_mount_001", -90, new Vector3(b.max.x, boreY, b.max.z - 0.10f));
                                 Slot("mod_mount_002", 180, new Vector3(boreX, b.min.y, b.max.z - 0.06f));

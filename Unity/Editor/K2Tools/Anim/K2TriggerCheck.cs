@@ -56,6 +56,23 @@ namespace K2Tools
                     log.AppendLine($"  {n,-20} 무기 좌표 {W(Find(model.transform, n).position).ToString("F4")}");
                 var trig = Find(model.transform, "weapon_trigger").GetComponentsInChildren<MeshRenderer>(true).Where(r => r.enabled && !r.name.Contains("LOD1")).ToArray();
                 foreach (var r in trig) { var b = r.bounds; log.AppendLine($"  방아쇠 메시 {r.name}: 무기 좌표 범위 {W(b.min).ToString("F4")} .. {W(b.max).ToString("F4")}"); }
+                if (A("-k2Hinge") != null)
+                {
+                    // 개머리판 메시 기준 경첩 축 점(-k2Hinge "x,y")을 높이 3곳에서 무기 좌표로 — 펼침/접힘에서 같으면 축이 맞다
+                    var hv = A("-k2Hinge").Split(',').Select(x => float.Parse(x, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+                    var smf = model.GetComponentsInChildren<MeshFilter>(true).First(m => m.name.StartsWith("stock_daewoo_k2_std_LOD0"));
+                    var vs = smf.sharedMesh.vertices; float zmin = vs.Min(v => v.z), zmax = vs.Max(v => v.z);
+                    foreach (var z in new[] { 0.02f, 0.05f, 0.08f })
+                        log.AppendLine($"  경첩점 메시({hv[0]},{hv[1]},{z}) → 무기 {W(smf.transform.TransformPoint(new Vector3(hv[0], hv[1], z))).ToString("F4")}");
+                    log.AppendLine($"  mod_stock 노드 무기 {W(Find(model.transform, "mod_stock").position).ToString("F4")} 회전 {Find(model.transform, "mod_stock").localEulerAngles.ToString("F2")}");
+                    log.AppendLine($"  메시 노드 {smf.name} 로컬 위치 {smf.transform.localPosition.ToString("F4")} 회전 {smf.transform.localEulerAngles.ToString("F1")} / 루트 회전 {smf.transform.parent.localEulerAngles.ToString("F1")}");
+                }
+                if (A("-k2List") != null)
+                    foreach (var r in model.GetComponentsInChildren<Renderer>(true).Where(r => r.enabled && r.gameObject.activeInHierarchy))
+                    {
+                        var b = r.bounds; var c = W(b.center);
+                        if (c.y > -0.30f) log.AppendLine($"  렌더러 {r.name} (부모 {r.transform.parent?.name}) 재질 [{string.Join(",", r.sharedMaterials.Select(m => m ? m.name + "/" + (m.shader ? m.shader.name : "-") : "null"))}] 중심 {c.ToString("F3")} 크기 {weapon.InverseTransformVector(b.size).ToString("F3")}");
+                    }
                 var tip = Find(model.transform, "Base HumanRDigit23"); var d3 = tip.childCount > 0 ? tip.GetChild(0) : tip;
                 log.AppendLine($"  검지 끝(자식) {d3.name} {W(d3.position).ToString("F4")}");
 
@@ -63,12 +80,22 @@ namespace K2Tools
                 RenderSettings.ambientLight = new Color(.65f, .65f, .65f);
                 var light = new GameObject("L").AddComponent<Light>(); light.type = LightType.Directional; light.intensity = 1.3f; light.transform.rotation = Quaternion.Euler(35, -50, 0);
                 var mat = new Material(Shader.Find("Standard")) { color = new Color(.35f, .37f, .4f) }; var red = new Material(Shader.Find("Standard")) { color = new Color(1f, .45f, .1f) };
-                foreach (var mr in model.GetComponentsInChildren<MeshRenderer>(true)) { if (mr.name.Contains("LOD1")) { mr.enabled = false; continue; } mr.sharedMaterials = mr.sharedMaterials.Select(_ => mr.transform.IsChildOf(Find(model.transform, "weapon_trigger")) ? red : mat).ToArray(); }
+                foreach (var mr in model.GetComponentsInChildren<MeshRenderer>(true)) { if (mr.name.Contains("LOD1")) { mr.enabled = false; continue; } var texMode = A("-k2Tex");   // MainTex / SpecMap / MainA: 원래 재질의 텍스처를 그대로 보여 준다(셰이더는 Unlit)
+                    mr.sharedMaterials = mr.sharedMaterials.Select(m0 =>
+                    {
+                        if (texMode != null && m0)
+                        {
+                            var prop = texMode == "MainA" ? "_MainTex" : "_" + texMode; if (!m0.HasProperty(prop)) return mat;
+                            var tx = m0.GetTexture(prop) as Texture2D; if (!tx) return mat;
+                            var u = new Material(Shader.Find(texMode == "MainA" ? "Unlit/Transparent" : "Unlit/Texture")) { mainTexture = tx }; return u;
+                        }
+                        return mr.transform.IsChildOf(Find(model.transform, "weapon_trigger")) ? red : mat;
+                    }).ToArray(); }
                 foreach (var lod in model.GetComponentsInChildren<LODGroup>(true)) lod.ForceLOD(0);
                 var hand = new Material(Shader.Find("Standard")) { color = new Color(.2f, .85f, 1f) };
                 foreach (var t in model.GetComponentsInChildren<Transform>(true))
                 {
-                    if (!t.name.StartsWith("Base HumanR") || t.parent == null || !t.parent.name.StartsWith("Base HumanR")) continue;
+                    if (!t.name.StartsWith("Base Human") || t.parent == null || !t.parent.name.StartsWith("Base Human")) continue;
                     var a = t.parent.position; var bpos = t.position; var dd = bpos - a; if (dd.magnitude < 1e-5f) continue;
                     var c = GameObject.CreatePrimitive(PrimitiveType.Cylinder); UnityEngine.Object.DestroyImmediate(c.GetComponent<Collider>());
                     c.transform.position = (a + bpos) / 2; c.transform.rotation = Quaternion.FromToRotation(Vector3.up, dd.normalized);
