@@ -18,11 +18,14 @@ namespace K2Tools
     {
         const string M4 = "Assets/K2Ripped/M4A1/Content/Weapons/m4a1/";
         // 도너(애니메이션·사운드·손 위치의 원본 무기) — 0.3.0부터 SCAR-L(Mk16): 노리쇠에 붙은 측면 장전손잡이·AR식 탄창/멈치가 K2와 가깝다
-        const string DONOR = "Assets/K2Ripped/SCAR/Content/Weapons/scar/";
-        const string DONOR_NAME = "weapon_fn_mk16_556x45";
+        // 0.4.0: 도너 AK-101 — 오른쪽 장전손잡이가 노리쇠에 붙은 구조가 K2와 같다. 바닐라 컨테이너 번들을 직접 개조하므로
+        // 여기서는 K2 메시를 AK 노드 기준으로 bake하고 부품 번들을 AK 슬롯 기준으로 만든다(K2Parts.BuildAll -k2Mode reskin).
+        const string DONOR = "Assets/K2Ripped/AK101/Content/Weapons/ak100/";
+        const string DONOR_NAME = "weapon_izhmash_ak101_556x45";
+        const string DONOR_MODEL = DONOR_NAME + ".generated.prefab";
         const string HIDE = "";   // Swaps에서 이 값이면 빈 메시로 숨긴다(K2에 없는 도너 부품)
         // 조준선 보정(m) — all-v007 조준 시점 렌더로 확정(가늠쇠 끝이 화면 중앙). -k2SightDy로 바꿔 시험 가능
-        static float SightDy => float.TryParse(Arg("-k2SightDy"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0.0075f;
+        static float SightDy => float.TryParse(Arg("-k2SightDy"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0f;   // 0.4.0(AK): 조준 시점 렌더로 다시 정한다
         const string SRC = "Assets/K2/Source/";
         // 번들 안 에셋 경로를 바닐라 규칙(번들 키와 같은 assets/content/weapons/<무기>/...)에 맞춘다 (body-v003)
         const string OUT = "Assets/Content/Weapons/daewoo_k2/";
@@ -32,24 +35,21 @@ namespace K2Tools
 
         // K2 부품(FBX 오브젝트 이름 뒤쪽) ↔ M4A1 weapon 아래 노드 — 정렬 기준점(하부 조작부 4개, 위·앞뒤 평균).
         // 탄창은 뺀다: K2 탄창 본 머리가 탄창 아래쪽이라 M4A1 mod_magazine(탄창 위쪽)과 116mm 어긋났다(body-v001).
-        static readonly (string k2, string m4)[] Anchors =
-        {
-            ("trigger", "mod_trigger_group/mod_trigger"), ("selector", "mod_trigger_group/mod_selector"), ("hammer", "mod_trigger_group/mod_hammer"),
-            ("bolt_release", "mod_catch"), ("mag_release_R", "mod_release"),
-        };
+        static readonly (string k2, string m4)[] Anchors = { ("trigger", "weapon_trigger"), ("hammer", "weapon_hammer") };
         // 참고로만 오차를 기록하는 쌍
         static readonly (string k2, string m4)[] InfoPairs = { ("magazine", "mod_magazine"), ("bolt_carrier", "weapon_bolt") };
-        // 도너(SCAR) 메시 노드(weapon 기준 경로) → 들어갈 K2 부품(HIDE면 숨김)
+        // 도너(AK-101) 메시 노드(weapon 기준 경로) → K2 부품. "a+b"는 한 메시로 합친다, HIDE는 빈 메시.
+        // AK 조정간은 오른쪽 큰 레버로 돌아가는 동작이라 K2 조정간(왼쪽 작은 것)은 총몸에 고정으로 합친다.
         static readonly (string node, string part)[] Swaps =
         {
-            ("weapon_fn_mk16_556x45_LOD0", "lower"), ("weapon_fn_mk16_556x45_LOD1", "lower"),
-            ("weapon_bolt", "bolt_carrier"), ("weapon_bolt/weapon_spring", HIDE),
-            ("mod_catch", "bolt_release"), ("mod_release", "mag_release_R"),
-            ("mod_trigger_group", HIDE), ("mod_trigger_group/mod_hammer", "hammer"),
-            ("mod_trigger_group/mod_selector", "selector"), ("mod_trigger_group/mod_trigger", "trigger"),
+            ("weapon_izhmash_ak101_556x45_LOD0", "lower+selector+bolt_release"), ("weapon_izhmash_ak74m_545x39_LOD1", "lower+selector+bolt_release"),
+            ("weapon_izhmash_ak74m_dovetail_LOD0", HIDE), ("weapon_izhmash_ak74m_kolodka_LOD0", HIDE), ("mod_stock_release", HIDE),
+            ("weapon_bolt", "bolt_carrier"), ("weapon_hammer", "hammer"), ("weapon_release", "mag_release_R+mag_release_L"),
+            ("weapon_selector", HIDE), ("weapon_trigger", "trigger"),
         };
-        // 새로 붙이는 메시: (부모 노드, 부품) — 도너에 대응 노드가 없는 K2 부품
-        static readonly (string parent, string part)[] Extras = { ("mod_release", "mag_release_L") };
+        static readonly (string parent, string part)[] Extras = { };
+        // 개조 매핑: 도너 메시 노드 GameObject 이름 → (bake 메시 이름, 재질 이름들) — tools/reskin_vanilla.py가 쓴다
+        public static readonly Dictionary<string, (string mesh, string[] mats)> ReskinMap = new();
 
         static readonly StringBuilder Log = new StringBuilder();
         static void L(string s) { Log.AppendLine(s); Debug.Log("K2BUILD " + s); }
@@ -188,7 +188,18 @@ namespace K2Tools
                     // 조준선 보정: 조준 카메라(애니메이션 노드라 못 옮김) 높이에 K2 가늠자 구멍 중심이 오도록 K2 전체를 올린다
                     // (all-v006 조준 시점 렌더에서 구멍 중심이 약 8mm 아래 — 인게임 "조준선 이상" 증상, 8.3mm 시험 후 7.5mm로)
                     offset.y += SightDy;
-                    L($"조준선 보정 +{SightDy * 1000:0.0} mm");
+                    L($"조준선 보정 {SightDy * 1000:+0.0;-0.0} mm");
+                    // K2 장전손잡이(노리쇠 메시에서 옆으로 튀어나온 부분) ↔ AK mod_charge(손이 잡는 곳)
+                    var boltMesh = parts["bolt_carrier"].GetComponent<MeshFilter>().sharedMesh; var bv = boltMesh.vertices;
+                    float cx = boltMesh.bounds.center.x;
+                    var side = bv.Where(v => Mathf.Abs(v.x - cx) > 0.018f).ToArray();
+                    var charge = weapon.Find("weapon_bolt/mod_charge");
+                    if (side.Length > 0 && charge)
+                    {
+                        var h = side.Aggregate(Vector3.zero, (acc, v) => acc + v) / side.Length + parts["bolt_carrier"].localPosition + offset;
+                        var r = RootPos(charge) - h;
+                        L($"  참고   장전손잡이(K2 {(h.x > RootPos(weapon.Find("weapon_bolt")).x ? "오른쪽" : "왼쪽")}) ↔ AK mod_charge 차이 {r.magnitude * 1000:0.0} mm (x{r.x * 1000:0}, y{r.y * 1000:0}, z{r.z * 1000:0})");
+                    }
                     L($"정렬 이동량(K2→M4, m): {offset.x:0.0000} {offset.y:0.0000} {offset.z:0.0000}");
                     foreach (var (k2, m4) in Anchors.Concat(InfoPairs))
                     {
@@ -204,12 +215,17 @@ namespace K2Tools
                     if (part == HIDE)
                     {
                         var mfh = t.GetComponent<MeshFilter>(); if (mfh) mfh.sharedMesh = EmptyMesh();
+                        if (computeOffset && mfh) ReskinMap[t.name] = (EmptyMesh().name, new string[0]);
                         var bch = t.GetComponent<BoxCollider>(); if (bch) bch.size = Vector3.zero;
                         return;
                     }
-                    var src = parts[part];
+                    var names = part.Split('+');
+                    var src = parts[names[0]];
                     var nodeM = root.transform.worldToLocalMatrix * t.localToWorldMatrix;   // 본체 공간에서 노드 행렬
-                    var mesh = Bake(src.GetComponent<MeshFilter>().sharedMesh, nodeM.inverse * Matrix4x4.Translate(src.localPosition + off), $"{rootName}_{t.name}");
+                    var mesh = names.Length == 1
+                        ? Bake(src.GetComponent<MeshFilter>().sharedMesh, nodeM.inverse * Matrix4x4.Translate(src.localPosition + off), $"{rootName}_{t.name}")
+                        : BakeCombined(names.Select(n => (parts[n].GetComponent<MeshFilter>().sharedMesh, nodeM.inverse * Matrix4x4.Translate(parts[n].localPosition + off))).ToArray(), $"{rootName}_{t.name}");
+                    if (computeOffset) ReskinMap[t.name] = (mesh.name, MatsFor(src, mats).Select(m => m.name).ToArray());
                     var mf = t.GetComponent<MeshFilter>(); var mr = t.GetComponent<MeshRenderer>();
                     if (mf) mf.sharedMesh = mesh;
                     if (mr) mr.sharedMaterials = MatsFor(src, mats);
@@ -249,6 +265,19 @@ namespace K2Tools
                 PrefabUtility.SaveAsPrefabAsset(root, path);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        // 여러 부품을 같은 노드 기준으로 변환해 한 메시로(재질이 같아 서브메시도 합친다)
+        static Mesh BakeCombined((Mesh mesh, Matrix4x4 m)[] items, string name)
+        {
+            var mesh = new Mesh { name = name, indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+            mesh.CombineMeshes(items.Select(i => new CombineInstance { mesh = i.mesh, transform = i.m }).ToArray(), true, true);
+            mesh.RecalculateBounds();
+            var dir = OUT + "Meshes/"; Directory.CreateDirectory(dir);
+            var path = dir + name.Replace(' ', '_') + ".asset";
+            if (AssetDatabase.LoadAssetAtPath<Mesh>(path)) AssetDatabase.DeleteAsset(path);
+            AssetDatabase.CreateAsset(mesh, path);
+            return mesh;
         }
 
         static Mesh EmptyMesh()

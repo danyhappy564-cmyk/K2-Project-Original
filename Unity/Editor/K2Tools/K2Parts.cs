@@ -20,6 +20,7 @@ namespace K2Tools
         const string M4P = "Assets/K2Ripped/M4Parts/Content/Items/Mods/";
         const string MODS = "Assets/Content/Items/Mods/";
         const string SHARED_BUNDLE = "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle";
+        const string BODY_MESH_BUNDLE = "assets/content/weapons/daewoo_k2/daewoo_k2_body_meshes.bundle";
         const string PLACEHOLDER_SHADERS = "shaders";
         const string SHADER_ASSET = "Assets/Shaders/Bumped Specular SMap.shader";
 
@@ -72,13 +73,11 @@ namespace K2Tools
                 }
 
                 // 1. 본체 (슬롯 mod_reciever·mod_stock을 K2 위치로)
-                var modelPath = Copy(DONOR + DONOR_NAME + "_model.generated.prefab", OUT + NAME + "_model.generated.prefab");
-                var simplePath = Copy(DONOR + DONOR_NAME + "_model_simple.generated.prefab", OUT + NAME + "_model_simple.generated.prefab");
-                var containerPath = Copy(DONOR + DONOR_NAME + "_container.prefab", OUT + NAME + "_container.prefab");
+                // 0.4.0 개조 모드: 컨테이너는 바닐라 번들을 직접 개조(tools/reskin_vanilla.py)하므로 여기선 본체 모델(bake·확인용)만 만든다
+                ReskinMap.Clear();
+                var modelPath = Copy(DONOR + DONOR_MODEL, OUT + NAME + "_model.generated.prefab");
                 Vector3 off = Vector3.zero;
                 EditModel(modelPath, NAME + "_model.generated", parts, mats, ref off, true);
-                EditModel(simplePath, NAME + "_model_simple.generated", parts, mats, ref off, false);
-                EditContainer(containerPath, modelPath, simplePath);
                 AssetDatabase.SaveAssets();
 
                 var body = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath).transform;
@@ -181,13 +180,14 @@ namespace K2Tools
 
                 // 3. 번들: 공용 텍스처·재질 + 본체 + 부품
                 // 실제로 쓰는 재질·텍스처만 공용 번들에(쓰지 않는 GL·개머리판 변형 텍스처는 빼서 용량 절약)
-                var shared = AssetDatabase.GetDependencies(new[] { containerPath }.Concat(PartDefs.Select(p => p.PrefabPath)).ToArray(), true)
+                var shared = AssetDatabase.GetDependencies(new[] { modelPath }.Concat(PartDefs.Select(p => p.PrefabPath)).ToArray(), true)
                     .Where(p => (p.StartsWith(OUT + "Materials/") && p.EndsWith(".mat")) || (p.StartsWith(SRC + "Textures/") && p.EndsWith(".png"))).ToArray();
                 L("공용 번들 에셋: " + string.Join(", ", shared.Select(Path.GetFileName)));
                 var builds = new List<AssetBundleBuild>
                 {
                     new AssetBundleBuild { assetBundleName = SHARED_BUNDLE, assetNames = shared },
-                    new AssetBundleBuild { assetBundleName = BUNDLE, assetNames = new[] { containerPath } },
+                    // 본체 메시만 담은 번들 — 개조한 바닐라 컨테이너가 이 메시들을 외부 참조한다
+                    new AssetBundleBuild { assetBundleName = BODY_MESH_BUNDLE, assetNames = ReskinMap.Values.Select(v => OUT + "Meshes/" + v.mesh.Replace(' ', '_') + ".asset").Distinct().ToArray() },
                 };
                 builds.AddRange(PartDefs.Select(d => new AssetBundleBuild { assetBundleName = d.Bundle, assetNames = new[] { d.PrefabPath } }));
                 // 셰이더는 번들에 넣지 않고 외부("shaders") 참조로 만든다 — 빌드 뒤 tools/fix_shader_refs.py가 게임 shaders 번들의
@@ -196,6 +196,16 @@ namespace K2Tools
                 var manifest = BuildPipeline.BuildAssetBundles(outDir, builds.ToArray(), BuildAssetBundleOptions.ChunkBasedCompression, BuildTarget.StandaloneWindows64);
                 if (manifest == null) throw new Exception("번들 빌드 실패");
                 VerifyAll(outDir, manifest, builds);
+                // 개조 매핑표: 도너 노드 → bake 메시·재질, 그리고 fireport(총구 화염) 위치를 K2 소염기 앞끝으로
+                var muzzleB = BodyBounds("muzzle");
+                var firePos = new Vector3(boreX, boreY, muzzleB.max.z);
+                var weaponNode = body.Find("Weapon_root/Weapon_root_anim/weapon");
+                var fireLocal = Rel(body, weaponNode).inverse.MultiplyPoint3x4(firePos);
+                var map = new StringBuilder("{\"meshBundle\":\"" + BODY_MESH_BUNDLE + "\",\"texturesBundle\":\"" + SHARED_BUNDLE + "\",\"meshes\":{");
+                map.Append(string.Join(",", ReskinMap.Select(kv => $"\"{kv.Key}\":{{\"mesh\":\"{kv.Value.mesh}\",\"materials\":[{string.Join(",", kv.Value.mats.Select(m => "\"" + m + "\""))}]}}")));
+                map.Append($"}},\"transforms\":{{\"fireport\":[{fireLocal.x.ToString(System.Globalization.CultureInfo.InvariantCulture)},{fireLocal.y.ToString(System.Globalization.CultureInfo.InvariantCulture)},{fireLocal.z.ToString(System.Globalization.CultureInfo.InvariantCulture)}]}}}}");
+                File.WriteAllText(Path.Combine(outDir, "reskin-map.json"), map.ToString(), new UTF8Encoding(false));
+                L($"개조 매핑 {ReskinMap.Count}개 노드, fireport weapon 기준 {fireLocal}");
                 PreviewAssembled(Path.Combine(outDir, "preview-assembled.png"), modelPath);
                 L("완료");
             }
@@ -258,7 +268,7 @@ namespace K2Tools
                     var size = new FileInfo(file).Length / 1048576.0;
                     var deps = manifest.GetAllDependencies(b.assetBundleName).Where(x => x != PLACEHOLDER_SHADERS).ToArray();
                     string detail = "";
-                    if (b.assetBundleName != SHARED_BUNDLE)
+                    if (b.assetBundleName != SHARED_BUNDLE && b.assetBundleName != BODY_MESH_BUNDLE)
                     {
                         var ab = AssetBundle.LoadFromFile(file);
                         if (!ab) throw new Exception("다시 읽기 실패 " + b.assetBundleName);
