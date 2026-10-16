@@ -4,6 +4,7 @@
 // → 손바닥 목표 = 총(weapon) 기준 첫 프레임 위치·회전 → 두 뼈 IK(상완·전완1) + 손바닥 회전.
 // 결과 형식은 K2AnimBakeCharge와 같다(tools/build_anim.py가 읽음).
 // 실행: -executeMethod K2Tools.K2AnimBakeFollow.Run -k2Mod <번들 폴더> -k2Game <Windows> -k2Clips <클립:프레임 수 JSON> -k2Side L -k2Out <폴더>
+//        [-k2ClipBundle <클립을 꺼낼 번들 키 — 기본 바닐라 ak100/client_assets, 조정간처럼 총 움직임을 바꾼 클립은 K2 동작 번들>]
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -51,7 +52,7 @@ namespace K2Tools
                 var solved = new HashSet<Transform> { upper, elbow, palm };
                 // 첫 프레임 값으로 되돌릴 뼈: 그쪽 팔·손가락 전부(쇄골 포함) — 빌드의 L_ARM 고정과 같은 범위
                 var keep = model.GetComponentsInChildren<Transform>(true).Where(t => t.name.StartsWith($"Base Human{side}") && !solved.Contains(t)).ToArray();
-                var clips = loaded["assets/content/weapons/ak100/client_assets.bundle"].LoadAllAssets<AnimationClip>().Where(c => want.ContainsKey(c.name)).ToArray();
+                var clips = loaded[A("-k2ClipBundle") ?? "assets/content/weapons/ak100/client_assets.bundle"].LoadAllAssets<AnimationClip>().Where(c => want.ContainsKey(c.name)).ToArray();
                 if (clips.Length != want.Count) throw new Exception($"클립 {clips.Length}/{want.Count}");
                 foreach (var clip in clips)
                 {

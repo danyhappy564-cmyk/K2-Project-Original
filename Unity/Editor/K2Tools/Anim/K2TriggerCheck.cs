@@ -56,6 +56,18 @@ namespace K2Tools
                     log.AppendLine($"  {n,-20} 무기 좌표 {W(Find(model.transform, n).position).ToString("F4")}");
                 var trig = Find(model.transform, "weapon_trigger").GetComponentsInChildren<MeshRenderer>(true).Where(r => r.enabled && !r.name.Contains("LOD1")).ToArray();
                 foreach (var r in trig) { var b = r.bounds; log.AppendLine($"  방아쇠 메시 {r.name}: 무기 좌표 범위 {W(b.min).ToString("F4")} .. {W(b.max).ToString("F4")}"); }
+                if (A("-k2Chamber") != null)
+                {
+                    // 약실 총알 자리: patron_in_weapon 노드(무기 좌표)와 K2 총열 메시 뒤끝·축 위치
+                    log.AppendLine($"  patron_in_weapon 무기 {W(Find(model.transform, "patron_in_weapon").position).ToString("F4")}");
+                    foreach (var mf in model.GetComponentsInChildren<MeshFilter>(true).Where(m => m.name.Contains("barrel") && m.name.Contains("LOD0")))
+                    {
+                        var vs = mf.sharedMesh.vertices.Select(v => W(mf.transform.TransformPoint(v))).ToArray();
+                        float ymax = vs.Max(v => v.y); var rear = vs.Where(v => v.y > ymax - 0.004f).ToArray();
+                        log.AppendLine($"  {mf.name}: 앞끝 y {vs.Min(v => v.y):F4} 뒤끝 y {ymax:F4} 뒤끝 단면 중심 x {rear.Average(v => v.x):F4} z {(rear.Min(v => v.z) + rear.Max(v => v.z)) / 2:F4} (z {rear.Min(v => v.z):F4}..{rear.Max(v => v.z):F4})");
+                    }
+                    var bolt = Find(model.transform, "weapon_bolt"); log.AppendLine($"  weapon_bolt 무기 {W(bolt.position).ToString("F4")}");
+                }
                 if (A("-k2Hinge") != null)
                 {
                     // 개머리판 메시 기준 경첩 축 점(-k2Hinge "x,y")을 높이 3곳에서 무기 좌표로 — 펼침/접힘에서 같으면 축이 맞다
@@ -89,7 +101,7 @@ namespace K2Tools
                             var tx = m0.GetTexture(prop) as Texture2D; if (!tx) return mat;
                             var u = new Material(Shader.Find(texMode == "MainA" ? "Unlit/Transparent" : "Unlit/Texture")) { mainTexture = tx }; return u;
                         }
-                        return mr.transform.IsChildOf(Find(model.transform, "weapon_trigger")) ? red : mat;
+                        return (mr.transform.IsChildOf(Find(model.transform, "weapon_trigger")) || mr.transform.IsChildOf(Find(model.transform, "weapon_bolt"))) ? red : mat;
                     }).ToArray(); }
                 foreach (var lod in model.GetComponentsInChildren<LODGroup>(true)) lod.ForceLOD(0);
                 var hand = new Material(Shader.Find("Standard")) { color = new Color(.2f, .85f, 1f) };

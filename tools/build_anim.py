@@ -7,12 +7,14 @@
 - 오른쪽 접기: 회전 축 = K2 실제 경첩 핀(HINGE). mod_stock 위치 x → −x + a, y + b, z + c(모든 클립), 접기 클립 오일러 y·z 반전,
   개머리판 메시 −HINGE(mirror_parts), 컨테이너 mod_stock 기본값도 같은 변환.
 - 접기 손: AK 왼손은 왼쪽으로 미는 동작이라 반대 — 왼팔·손가락은 처음 자세로 고정, 상완·전완1·손바닥은 총을 따라가는 IK(K2AnimBakeFollow, BAKE_L).
-- 조정간: firemode 클립의 오른팔 고정(손가락만) + 총 굴림을 좌우 거울(AK는 오른쪽 레버를, K2는 왼쪽 조정간을 보여 줌).
+- 조정간: firemode 클립의 오른팔 고정(손가락만) + 총 굴림을 좌우 거울(AK는 오른쪽 레버를, K2는 왼쪽 조정간을 보여 줌)
+  + 왼손은 총을 따라 핸드가드를 잡음(0.9.3 — 0.9.2는 왼팔이 원래 동작대로 총을 놓쳐 허공으로 뻗음).
+- 약실 총알·탄피 배출: patron_in_weapon·shellport를 K2 약실 자리로(CHAMBER_SHIFT, 0.9.3).
 - 탄창 넣기: mag_in 클립에서 끼울 자리에 가까울수록 mod_magazine 기울기를 0으로(곧게 밀어 넣음 — K2 탄창이 총 몸을 뚫던 문제).
 - 탄창 칸: mod_magazine·mod_magazine_new +z LIFT(다른 탄창이 K2 탄창 구멍에), K2 전용 탄창 메시는 −LIFT.
 m_ValueArrayDelta(곡선별 시작·끝 값)도 같은 선형 변환으로 맞춘다.
 
-  python tools/build_anim.py <K2 번들 폴더(ak-v014)> <출력 폴더>
+  python tools/build_anim.py <K2 번들 폴더(ak-v014)> <출력 폴더>   (0.9.3: anim-v009 → ak-v016)
 필요: Codex 작업 폴더(코덱스방/K2-anim-v001)의 ak_graph_v003a·ak_curve_fix_v003a·build_ak_anim_v002a 모듈, bake-ak-v003/ik-curves.json,
       BAKE_R(K2AnimBakeCharge 결과). 조립: ak-v010 + 출력 → ak-v013, bundles.json에 override 번들 항목·컨테이너 의존 추가.
 """
@@ -30,7 +32,12 @@ G.SOURCE = SRC
 HINGE = (0.0359, 0.0205)
 LIFT = 0.027   # K2 모델을 올린 양(-k2SightDy 0.011118 − (−0.015882)) — aim_camera·탄창 칸에 같이 더한다
 BAKE_R = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-charge-v001/ik-curves.json'
-BAKE_L = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-fold-v001/ik-curves.json'
+BAKE_L = ['F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-fold-v001/ik-curves.json',      # 접기: 왼손이 총을 따라감
+          'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-firemode-v001/ik-curves.json']  # 조정간(총 굴림 거울 뒤)
+# 약실 총알·탄피 배출 자리(0.9.3): AK patron_in_weapon(y −0.4555, z −0.0007)이 K2 약실(총열 뒤끝 y −0.4292, 축 z +0.0255)보다
+# 26mm 앞·26mm 아래라 약실 확인 때 총알이 몸통 밖으로 보였다(인게임). 무기 좌표 (0, +0.0263, +0.0262) 이동 — 모든 클립 + 컨테이너 기본값.
+CHAMBER_SHIFT = (0.0, 0.0263, 0.0262)
+CHAMBER_NODES = ('patron_in_weapon', 'shellport')
 SELECTOR = ('ak100_firemode_0', 'ak100_firemode_1')
 MIRROR_NODES = ('weapon',)   # 조정간 클립에서 좌우 거울로 뒤집는 노드(총 굴림) — K2 조정간은 왼쪽
 R_ARM = {'Base HumanRCollarbone', 'Base HumanRUpperarm', 'Base HumanRForearm1', 'Base HumanRForearm2', 'Base HumanRForearm3', 'Base HumanRPalm',
@@ -56,8 +63,9 @@ def main():
     baked = {c['name']: c for c in bake['clips'] if c['side'] == 'L'}          # charge_2(왼손 당김)는 Codex 결과
     mine = json.loads(pathlib.Path(BAKE_R).read_text(encoding='utf-8')); assert mine['passed']
     baked.update({c['name']: c for c in mine['clips']})                         # 오른손이 손잡이 만지는 10개(K2AnimBakeCharge)
-    fold = json.loads(pathlib.Path(BAKE_L).read_text(encoding='utf-8')); assert fold['passed']
-    baked.update({c['name']: c for c in fold['clips']})                         # 접기 클립 왼손이 핸드가드를 따라감(K2AnimBakeFollow)
+    for bl in BAKE_L:
+        fold = json.loads(pathlib.Path(bl).read_text(encoding='utf-8')); assert fold['passed']
+        baked.update({c['name']: c for c in fold['clips']})                     # 왼손이 총(핸드가드)을 따라감(K2AnimBakeFollow)
     changed = {}; changes = []
     for data in baked.values():
         for sample in data['frames']:
@@ -111,7 +119,7 @@ def main():
         solved = set()
         if t['m_Name'] in baked:
             sd = baked[t['m_Name']]['side']; solved = {'Base Human' + sd + n for n in ('Upperarm', 'Forearm1', 'Palm')}
-        for names in ([R_ARM] if t['m_Name'] in SELECTOR else []) + ([L_ARM] if t['m_Name'] in FOLD else []):
+        for names in ([R_ARM, L_ARM] if t['m_Name'] in SELECTOR else []) + ([L_ARM] if t['m_Name'] in FOLD else []):
             for b in bs:
                 last = b['path'].split('/')[-1]
                 if last in solved and b['attribute'] == 4: continue
@@ -127,7 +135,7 @@ def main():
                     elif b['attribute'] == 4: lin(t, b['offset'] + 1, scale=-1); lin(t, b['offset'] + 2, scale=-1); row.setdefault('mirror', []).append('rot')
                     elif b['attribute'] == 2: raise AssertionError('쿼터니언 곡선은 처리 안 함')
         # 탄창 넣기(0.9.2): AK는 끼울 자리에서 앞으로 ~25° 기울여 걸었다 젖혀 넣는다 — K2 탄창은 회전 중심보다 위로 길어 총 몸을 뚫는다.
-        # 끼울 자리에 가까울수록 기울기를 0으로(1cm 안 = 0, 8cm 밖 = 원래): 곧게 밀어 넣는 STANAG식. 밀집 곡선만(프레임별).
+        # 끼울 자리에 가까울수록 기울기를 0으로(6cm 안 = 0, 14cm 밖 = 원래): 곧게 밀어 넣는 STANAG식. 밀집 곡선만(프레임별).
         if 'mag_in' in t['m_Name']:
             c = clipdata(t); de = c['m_DenseClip']; ns = c['m_StreamedClip']['curveCount']; nd = de['m_CurveCount']; a = de['m_SampleArray']
             pos = next((b for b in bs if b['path'].endswith('/mod_magazine') and b['attribute'] == 1), None)
@@ -138,7 +146,7 @@ def main():
                 for f in range(de['m_FrameCount']):
                     tm = de['m_BeginTime'] + f / de['m_SampleRate']
                     pnow = [eval_scalar(c, pos['offset'] + j, tm) for j in range(3)]
-                    d = math.dist(pnow, seat); u = min(1, max(0, (d - 0.01) / 0.07)); w = u * u * (3 - 2 * u)
+                    d = math.dist(pnow, seat); u = min(1, max(0, (d - 0.06) / 0.08)); w = u * u * (3 - 2 * u)   # 0.9.3: 1~8cm → 6~14cm(0.9.2 인게임: 2~5cm에서 아직 기울어 리시버 앞을 뚫음)
                     for j in range(3):
                         k = f * nd + rot['offset'] - ns + j; a[k] *= w
                     n += w < 0.999
@@ -148,6 +156,12 @@ def main():
         for b in bs:
             if b['attribute'] == 1 and b['path'].split('/')[-1] in ('mod_magazine', 'mod_magazine_new'):
                 lin(t, b['offset'] + 2, add=LIFT); row.setdefault('mag', []).append(b['path'].split('/')[-1])
+        for b in bs:
+            if b['attribute'] == 1 and b['path'].split('/')[-1] in CHAMBER_NODES:
+                assert b['path'].endswith('/weapon/' + b['path'].split('/')[-1]), b['path']   # 부모가 weapon이라 로컬 = 무기 좌표
+                for j in range(3):
+                    if CHAMBER_SHIFT[j]: lin(t, b['offset'] + j, add=CHAMBER_SHIFT[j])
+                row.setdefault('chamber', []).append(b['path'].split('/')[-1])
         changed[ident] = t; changes.append(row)
     assert len(changed) == 98, len(changed)
 
@@ -222,6 +236,14 @@ def main():
             if gos.get(tr['m_GameObject']['m_PathID']) in ('mod_magazine', 'mod_magazine_new'):
                 tr['m_LocalPosition']['z'] += LIFT; o.save_typetree(tr); nmag += 1
     assert nmag >= 2, nmag
+    nch = 0
+    for o in body.objects.values():
+        if o.type.name == 'Transform':
+            tr = o.read_typetree()
+            if gos.get(tr['m_GameObject']['m_PathID']) in CHAMBER_NODES:
+                for k, v in zip('xyz', CHAMBER_SHIFT): tr['m_LocalPosition'][k] += v
+                o.save_typetree(tr); nch += 1
+    print('약실·배출 노드(컨테이너)', nch)
     shift_children(SRC, OUT / 'bundles', MAGS, (0, -LIFT, 0))   # 슬롯 회전 0(평소 자세) → 루트 기준 = X−90 × (0,0,−LIFT) = (0, −LIFT, 0)
     renamed(bodyenv, 'CAB-' + hashlib.sha256(b'K2-anim-v004-claude-container').hexdigest()[:32])
     dest = OUT / 'bundles' / BODY; dest.parent.mkdir(parents=True, exist_ok=True); dest.write_bytes(bodyenv.file.save(packer='lz4'))
