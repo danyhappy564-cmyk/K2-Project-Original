@@ -27,6 +27,7 @@ namespace K2Tools
         class Part
         {
             public string Id, Template, Folder, Name, Mesh, Parent, Slot;
+            public bool Alt;   // 같은 슬롯의 교체 부품(조립 미리보기에는 기본 부품만)
             public string PrefabPath => MODS + Folder + "/" + Name + ".prefab";
             public string Bundle => ("assets/content/items/mods/" + Folder + "/" + Name + ".bundle").ToLowerInvariant();
             public Matrix4x4 S;   // 부모 슬롯(= 이 부품 루트)의 본체 공간 행렬
@@ -40,6 +41,10 @@ namespace K2Tools
             new Part { Id = "muzzle", Template = "muzzle/muzzle_ar15_colt_usgi_a2_556x45", Folder = "muzzle", Name = "muzzle_daewoo_k2_std_556x45", Mesh = "muzzle", Parent = "barrel", Slot = "mod_muzzle" },
             new Part { Id = "stock", Template = "stocks/stock_ar15_colt_stock_tube_std", Folder = "stocks", Name = "stock_daewoo_k2_std", Mesh = "stock", Parent = "body", Slot = "mod_stock" },
             new Part { Id = "magazine", Template = "magazines/mag_stanag_colt_ar15_std_556x45_30", Folder = "magazines", Name = "mag_stanag_daewoo_k2_std_556x45_30", Mesh = "magazine", Parent = "body", Slot = "mod_magazine" },
+            // 교체 부품(원본 팩 UPDATE2·update_3_stocks — k2_parts.fbx에 이미 들어 있음). 개머리판은 도너 AK-101 접기 동작(왼쪽 180°)을 그대로 쓴다
+            new Part { Id = "handguard_classic", Template = "handguards/handguard_ar15_colt_m4_length_std", Folder = "handguards", Name = "handguard_daewoo_k2_classic", Mesh = "handguard_classic", Parent = "upper", Slot = "mod_handguard", Alt = true },
+            new Part { Id = "stock_ar", Template = "stocks/stock_ar15_colt_stock_tube_std", Folder = "stocks", Name = "stock_daewoo_k2_ar", Mesh = "ar_stock", Parent = "body", Slot = "mod_stock", Alt = true },
+            new Part { Id = "stock_light", Template = "stocks/stock_ar15_colt_stock_tube_std", Folder = "stocks", Name = "stock_daewoo_k2_light", Mesh = "light", Parent = "body", Slot = "mod_stock", Alt = true },
         };
 
         // 게임이 부품을 슬롯에 붙일 때 더하는 회전(바닐라 M4 조립 실험으로 확인)
@@ -162,7 +167,15 @@ namespace K2Tools
                                 var sub = r.Cast<Transform>().FirstOrDefault(t => t.name == "mod_muzzle"); if (sub) Put(sub, front);
                                 break;
                             }
+                            case "handguard_classic":
+                            {
+                                // 클래식(원형) 손잡이엔 레일이 없다 — 조준경 슬롯 없이, 템플릿 하위 mod_handguard만 뺀다
+                                var sub = r.Cast<Transform>().FirstOrDefault(t => t.name == "mod_handguard"); if (sub) UnityEngine.Object.DestroyImmediate(sub.gameObject);
+                                break;
+                            }
                             case "stock":
+                            case "stock_ar":
+                            case "stock_light":
                                 foreach (var t in r.Cast<Transform>().Where(t => t.name.StartsWith("mod_stock")).ToArray()) UnityEngine.Object.DestroyImmediate(t.gameObject);
                                 break;
                         }
@@ -302,7 +315,7 @@ namespace K2Tools
             var body = (GameObject)UnityEngine.Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(modelPath));
             var all = new List<GameObject> { body };
             var placed = new Dictionary<string, Transform> { ["body"] = body.transform };
-            foreach (var d in PartDefs)
+            foreach (var d in PartDefs.Where(p => !p.Alt))
             {
                 var parent = placed[d.Parent];
                 var slot = FindDeep(parent, d.Slot);

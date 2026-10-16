@@ -52,6 +52,6 @@ def patch(donor,root,mapfile,out):
  out.parent.mkdir(parents=True,exist_ok=True)
  out.write_bytes(env.file.save(packer='lz4'))
  report=verify(out,root,mapping)
- (out.parents[4]/'reskin-validation.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
+ (root/'reskin-validation.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
  print(json.dumps(report))
 if __name__=='__main__':patch(*sys.argv[1:5])

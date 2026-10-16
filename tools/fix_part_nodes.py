@@ -6,21 +6,25 @@
   · 손잡이의 왼손 기준 노드 Base HumanLPalm(·Base HumanLPalm 1)이 AK-101 손잡이 위치보다 약 11cm 뒤(리시버 앞)에 있었다 → 왼손이 리시버를 잡음.
   · 탄창의 patron_001~003(위쪽 총알 3발 위치)이 Colt 탄창 메시 기준이라 K2 탄창보다 약 4.5cm 뒤·9mm 아래 → 총알이 탄창 밖에 보임.
 - 고침: 왼손 노드는 바닐라 AK-74M 손잡이(AK-101 기본 구성)의 손바닥·손가락 자세를 그대로 가져와 무기 좌표에서 같은 자리에 두되
-  두 손잡이 외곽(BoxCollider) 왼쪽 면·아랫면 차이만큼 옮겨 손과 손잡이 표면 사이 간격을 AK와 같게 하고,
+  두 손잡이 외곽(BoxCollider) 왼쪽 면·아랫면 차이(뒤끝이 AK보다 앞이면 그 차이도)만큼 옮겨 손과 손잡이 표면 사이 간격을 AK와 같게 하고,
   총알 노드는 Colt 탄창 윗면(급탄구 뒤끝·윗면) 기준 상대 위치를 K2 탄창 윗면 기준으로 옮긴다.
 
 좌표: 무기(weapon) 노드 기준 -y가 앞, +z가 위. 슬롯 회전은 단위, 부품 루트는 슬롯 회전 × X축 +90°로 붙는다.
 
-  python tools/fix_part_nodes.py <K2 번들 폴더(assets/ 위)> <출력 폴더> <게임 StreamingAssets/Windows(읽기 전용)>
+  python tools/fix_part_nodes.py <K2 번들 폴더(assets/ 위)> <출력 폴더> <게임 StreamingAssets/Windows(읽기 전용)> [--inplace]
+  --inplace: 출력 폴더 = 입력 폴더, 고친 번들을 제자리에 바꿔 쓴다(finish_bundles.py). 두 번 돌리면 총알이 두 번 옮겨지므로
+  part-nodes.json이 이미 있으면 멈춘다.
 """
 import os, sys, json
 import UnityPy
 
 src_root, dst_root, game = sys.argv[1], sys.argv[2], sys.argv[3]
+INPLACE = "--inplace" in sys.argv[4:]
+if os.path.exists(os.path.join(dst_root, "part-nodes.json")): sys.exit(f"STOP: 이미 처리됨 — {dst_root}/part-nodes.json")
 C = "assets/content/"
 K2_CONTAINER = C + "weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle"
 K2_UPPER = C + "items/mods/recievers/reciever_daewoo_k2_std.bundle"
-K2_HANDGUARD = C + "items/mods/handguards/handguard_daewoo_k2_mits_long.bundle"
+K2_HANDGUARDS = [C + "items/mods/handguards/handguard_daewoo_k2_mits_long.bundle", C + "items/mods/handguards/handguard_daewoo_k2_classic.bundle"]
 K2_MAG = C + "items/mods/magazines/mag_stanag_daewoo_k2_std_556x45_30.bundle"
 AK_HANDGUARD = C + "items/mods/handguards/handguard_ak_izhmash_ak74m_std_plastic.bundle"   # AK-101 기본 프리셋 손잡이
 COLT_MAG = C + "items/mods/magazines/mag_stanag_colt_ar15_std_556x45_30.bundle"            # K2 탄창 템플릿
@@ -48,7 +52,7 @@ class Tree:
     """번들 하나의 Transform을 이름·경로로 다룬다."""
     def __init__(self, path):
         self.path = path
-        self.env = UnityPy.load(path)
+        with open(path, "rb") as f: self.env = UnityPy.load(f.read())   # 바이트로 — 제자리 저장 때 파일을 잡고 있지 않게
         self.objs = {o.path_id: o for o in self.env.objects}
         self.tt = {pid: o.read_typetree() for pid, o in self.objs.items() if o.type.name == "Transform"}
         self.names = {pid: self.objs[t["m_GameObject"]["m_PathID"]].read_typetree()["m_Name"] for pid, t in self.tt.items()}
@@ -89,10 +93,12 @@ class Tree:
         return tr
 
     def save(self, out):
-        if os.path.exists(out): sys.exit(f"STOP: 이미 있음 — 덮어쓰지 않습니다: {out}")
+        if os.path.exists(out) and not (INPLACE and os.path.samefile(out, self.path)): sys.exit(f"STOP: 이미 있음 — 덮어쓰지 않습니다: {out}")
         for pid in self.dirty: self.objs[pid].save_typetree(self.tt[pid])
         os.makedirs(os.path.dirname(out), exist_ok=True)
-        with open(out, "wb") as f: f.write(self.env.file.save(packer="lz4"))
+        data = self.env.file.save(packer="lz4")
+        with open(out + ".tmp", "wb") as f: f.write(data)
+        os.replace(out + ".tmp", out)
 
 
 def fmt(v): return "(" + ", ".join(f"{x:+.4f}" for x in v) + ")"
@@ -102,22 +108,14 @@ report = {}
 cont = Tree(os.path.join(src_root, K2_CONTAINER))
 model = next(pid for pid, n in cont.names.items() if n.endswith(".generated") and not n.endswith("_simple.generated"))
 weapon = cont.find("weapon", under=model)
-upper, hg, akhg = Tree(os.path.join(src_root, K2_UPPER)), Tree(os.path.join(src_root, K2_HANDGUARD)), Tree(os.path.join(game, AK_HANDGUARD))
+upper, akhg = Tree(os.path.join(src_root, K2_UPPER)), Tree(os.path.join(game, AK_HANDGUARD))
 up_root = next(pid for pid, t in upper.tt.items() if t["m_Father"]["m_PathID"] == 0)
-hg_root = next(pid for pid, t in hg.tt.items() if t["m_Father"]["m_PathID"] == 0)
 ak_root = next(pid for pid, t in akhg.tt.items() if t["m_Father"]["m_PathID"] == 0)
 
 # AK-101 기본 구성: 손잡이는 본체 mod_handguard 슬롯에 바로 붙는다 / K2: 본체 mod_reciever → K2 상부 mod_handguard
 ak_hg_world = compose(cont.world(cont.find("mod_handguard", under=weapon), weapon), ATTACH)
 up_world = compose(cont.world(cont.find("mod_reciever", under=weapon), weapon), ATTACH)
 k2_hg_world = compose(compose(up_world, upper.world(upper.find("mod_handguard"), up_root)), ATTACH)
-
-
-def copy_pose(dst, src):   # 손가락: 같은 순서의 자식끼리 로컬 자세 복사(바닐라 이름에 " 1"이 섞여 있어 이름으로 짝짓지 않음)
-    dc, sc = hg.children(dst), akhg.children(src)
-    if len(dc) != len(sc): sys.exit(f"STOP: 손가락 구조 다름 {hg.names[dst]} {len(dc)} ↔ {akhg.names[src]} {len(sc)}")
-    for d, s in zip(dc, sc):
-        hg.set_local(d, akhg.local(s)); copy_pose(d, s)
 
 
 def box(tree, root, root_world):
@@ -131,27 +129,41 @@ def box(tree, root, root_world):
     return tuple(min(p[i] for p in pts) for i in range(3)), tuple(max(p[i] for p in pts) for i in range(3))
 
 
-# AK 손바닥과 손잡이 왼쪽 면·아랫면 사이 간격을 K2에서도 같게: K2 손잡이는 AK보다 아랫면이 높고 폭이 넓다
-ak_box, k2_box = box(akhg, ak_root, ak_hg_world), box(hg, hg_root, k2_hg_world)
-surface = (k2_box[0][0] - ak_box[0][0], 0.0, k2_box[0][2] - ak_box[0][2])
-print(f"손잡이 외곽(무기 좌표): AK {fmt(ak_box[0])}..{fmt(ak_box[1])} / K2 {fmt(k2_box[0])}..{fmt(k2_box[1])} → 왼쪽 면·아랫면 차이 {fmt(surface)} m")
-report["surface_shift"] = surface
+ak_box = box(akhg, ak_root, ak_hg_world)
+saved = []
+for rel in K2_HANDGUARDS:
+    hg = Tree(os.path.join(src_root, rel)); name = os.path.basename(rel)
+    hg_root = next(pid for pid, t in hg.tt.items() if t["m_Father"]["m_PathID"] == 0)
 
-for palm in ["Base HumanLPalm", "Base HumanLPalm 1"]:
-    k_pid, a_pid = hg.find(palm), akhg.find(palm)
-    before = compose(k2_hg_world, hg.local(k_pid))[0]
-    target = compose(ak_hg_world, akhg.local(a_pid))
-    target = (add(target[0], surface), target[1])
-    hg.set_local(k_pid, relative(k2_hg_world, target))
-    copy_pose(k_pid, a_pid)
-    after = compose(k2_hg_world, hg.local(k_pid))[0]
-    print(f"왼손 {palm}: 무기 좌표 {fmt(before)} → {fmt(after)} (목표 {fmt(target[0])}, 이동 {fmt(sub(after, before))} m)")
-    report[palm] = {"before": before, "after": after}
+    def copy_pose(dst, src):   # 손가락: 같은 순서의 자식끼리 로컬 자세 복사(바닐라 이름에 " 1"이 섞여 있어 이름으로 짝짓지 않음)
+        dc, sc = hg.children(dst), akhg.children(src)
+        if len(dc) != len(sc): sys.exit(f"STOP: 손가락 구조 다름 {hg.names[dst]} {len(dc)} ↔ {akhg.names[src]} {len(sc)}")
+        for d, s in zip(dc, sc):
+            hg.set_local(d, akhg.local(s)); copy_pose(d, s)
+
+    # AK 손바닥과 손잡이 왼쪽 면·아랫면 사이 간격을 K2에서도 같게: K2 손잡이는 AK보다 아랫면이 높고 폭이 넓다
+    k2_box = box(hg, hg_root, k2_hg_world)
+    # 앞뒤: AK 손바닥은 손잡이 뒤끝에 걸쳐 있다. K2 손잡이 뒤끝이 AK보다 앞이면(클래식) 그만큼 앞으로, 더 뒤까지 오면(MITS 긴 것) 그대로
+    surface = (k2_box[0][0] - ak_box[0][0], min(0.0, k2_box[1][1] - ak_box[1][1]), k2_box[0][2] - ak_box[0][2])
+    print(f"{name} 외곽(무기 좌표): AK {fmt(ak_box[0])}..{fmt(ak_box[1])} / K2 {fmt(k2_box[0])}..{fmt(k2_box[1])} → 왼쪽 면·앞뒤·아랫면 보정 {fmt(surface)} m")
+    rep = report[name] = {"surface_shift": surface, "box": k2_box}
+    for palm in ["Base HumanLPalm", "Base HumanLPalm 1"]:
+        k_pid, a_pid = hg.find(palm), akhg.find(palm)
+        before = compose(k2_hg_world, hg.local(k_pid))[0]
+        target = compose(ak_hg_world, akhg.local(a_pid))
+        target = (add(target[0], surface), target[1])
+        hg.set_local(k_pid, relative(k2_hg_world, target))
+        copy_pose(k_pid, a_pid)
+        after = compose(k2_hg_world, hg.local(k_pid))[0]
+        print(f"  왼손 {palm}: 무기 좌표 {fmt(before)} → {fmt(after)} (목표 {fmt(target[0])}, 이동 {fmt(sub(after, before))} m)")
+        if not (k2_box[0][1] - 0.03 <= after[1] <= k2_box[1][1] + 0.03): print(f"  경고: 손바닥 앞뒤 위치가 손잡이 범위 밖 y{after[1]:+.4f}")
+        rep[palm] = {"before": before, "after": after}
+    hg.save(os.path.join(dst_root, rel)); saved.append((rel, ["Base HumanLPalm", "Base HumanLPalm 1"]))
 
 # ── 2) 탄창 총알: Colt 윗면 기준 상대 위치 → K2 윗면 기준 ──
 def mag_top(path):
     """탄창 윗면(가장 높은 z)과 급탄구 뒤끝(윗부분 2cm 안에서 가장 큰 y), 무기 좌표 기준(메시→루트 Rx-90, 루트→슬롯 Rx+90 → 항등)."""
-    env = UnityPy.load(path)
+    with open(path, "rb") as f: env = UnityPy.load(f.read())
     mesh = next(o.read() for o in env.objects if o.type.name == "Mesh" and o.read().m_Name.endswith("_LOD0"))
     v = [tuple(float(a) for a in l.split()[1:4]) for l in mesh.export().splitlines() if l.startswith("v ")]
     top = max(p[2] for p in v)
@@ -171,11 +183,10 @@ for n in ["patron_001", "patron_002", "patron_003"]:
     print(f"  {n}: 루트 {fmt(p)} → {fmt(add(p, d_root))}")
 report["patron_shift_slot"] = d_slot
 
-hg.save(os.path.join(dst_root, K2_HANDGUARD))
-mag.save(os.path.join(dst_root, K2_MAG))
+mag.save(os.path.join(dst_root, K2_MAG)); saved.append((K2_MAG, ["patron_001", "patron_002", "patron_003"]))
 json.dump(report, open(os.path.join(dst_root, "part-nodes.json"), "w", encoding="utf-8"), indent=1)
 
 # 다시 읽어 확인
-for rel, names in [(K2_HANDGUARD, ["Base HumanLPalm", "Base HumanLPalm 1"]), (K2_MAG, ["patron_001", "patron_002", "patron_003"])]:
+for rel, names in saved:
     t = Tree(os.path.join(dst_root, rel))
     for n in names: print("확인:", os.path.basename(rel), n, fmt(t.local(t.find(n))[0]))

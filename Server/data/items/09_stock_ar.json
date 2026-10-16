@@ -1,0 +1,30 @@
+{
+  "newId": "d22000000000000000000018",
+  "itemTplToClone": "5a9eb32da2750c00171b3f9c",
+  "parentId": "55818a594bdc2db9688b456a",
+  "newItemName": "stock_daewoo_k2_ar",
+  "handbookParentId": "5b5f757486f774093e6cb507",
+  "handbookPriceRoubles": 11000,
+  "fleaPriceRoubles": 11000,
+  "overrideProperties": {
+    "Prefab": {
+      "path": "assets/content/items/mods/stocks/stock_daewoo_k2_ar.bundle",
+      "rcid": ""
+    },
+    "Weight": 0.42,
+    "ExaminedByDefault": true,
+    "CanSellOnRagfair": false
+  },
+  "locales": {
+    "en": {
+      "name": "Daewoo K2 AR-style stock",
+      "shortName": "K2 AR",
+      "description": "AR-style collapsible stock on a side-folding adapter for the K2."
+    },
+    "kr": {
+      "name": "대우정밀 K2 AR식 개머리판",
+      "shortName": "K2 AR",
+      "description": "접이식 어댑터에 단 K2용 AR식 신축 개머리판입니다."
+    }
+  }
+}

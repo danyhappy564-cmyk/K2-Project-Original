@@ -1,0 +1,30 @@
+{
+  "newId": "d22000000000000000000019",
+  "itemTplToClone": "5a9eb32da2750c00171b3f9c",
+  "parentId": "55818a594bdc2db9688b456a",
+  "newItemName": "stock_daewoo_k2_light",
+  "handbookParentId": "5b5f757486f774093e6cb507",
+  "handbookPriceRoubles": 8000,
+  "fleaPriceRoubles": 8000,
+  "overrideProperties": {
+    "Prefab": {
+      "path": "assets/content/items/mods/stocks/stock_daewoo_k2_light.bundle",
+      "rcid": ""
+    },
+    "Weight": 0.3,
+    "ExaminedByDefault": true,
+    "CanSellOnRagfair": false
+  },
+  "locales": {
+    "en": {
+      "name": "Daewoo K2 skeleton stock",
+      "shortName": "K2 skel.",
+      "description": "Lightweight tubular side-folding stock for the K2."
+    },
+    "kr": {
+      "name": "대우정밀 K2 경량 개머리판",
+      "shortName": "K2 경량",
+      "description": "파이프형 K2 경량 접이식 개머리판입니다."
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "newId": "d22000000000000000000017",
+  "itemTplToClone": "5ae30db85acfc408fb139a05",
+  "parentId": "55818a104bdc2db9688b4569",
+  "newItemName": "handguard_daewoo_k2_classic",
+  "handbookParentId": "5b5f75e486f77447ec5d7712",
+  "handbookPriceRoubles": 6000,
+  "fleaPriceRoubles": 6000,
+  "overrideProperties": {
+    "Prefab": {
+      "path": "assets/content/items/mods/handguards/handguard_daewoo_k2_classic.bundle",
+      "rcid": ""
+    },
+    "Weight": 0.26,
+    "ExaminedByDefault": true,
+    "CanSellOnRagfair": false
+  },
+  "locales": {
+    "en": {
+      "name": "Daewoo K2 handguard",
+      "shortName": "K2 HG",
+      "description": "Original ribbed polymer handguard of the K2 rifle. No rail."
+    },
+    "kr": {
+      "name": "대우정밀 K2 핸드가드",
+      "shortName": "K2 HG",
+      "description": "K2 소총의 원래 홈 파인 폴리머 핸드가드입니다. 레일이 없습니다."
+    }
+  }
+}
