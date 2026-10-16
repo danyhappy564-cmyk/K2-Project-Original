@@ -1,0 +1,9 @@
+<Project>
+  <!--
+    사용법: 이 파일을 "LocalSettings.props"로 복사(이름에서 ".example" 빼기)하고
+    SptRoot를 본인 PC의 실제 SPT 설치 경로로 바꾸세요. LocalSettings.props는 git에 올라가지 않습니다.
+  -->
+  <PropertyGroup>
+    <SptRoot>E:\SPT 4.1</SptRoot>
+  </PropertyGroup>
+</Project>

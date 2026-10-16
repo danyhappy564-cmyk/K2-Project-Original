@@ -1,0 +1,44 @@
+# 모델링 원본·작업 파일은 저장소에 올리지 않는다 (Unity 번들과 DLL만 올림)
+*.blend
+*.blend1
+*.blend2
+*.blend@*
+*.fbx
+*.obj
+*.mtl
+*.dae
+*.glb
+*.gltf
+Assets-Local/
+Modeling/
+Blender/output/
+
+# Unity 캐시·자동 생성 파일 (Unity/ 폴더로 한정 — 손으로 쓴 Server/Client csproj는 커밋 대상)
+Unity/Library/
+Unity/Logs/
+Unity/Temp/
+Unity/obj/
+Unity/Build/
+Unity/Builds/
+Unity/UserSettings/
+Unity/*.csproj
+Unity/*.sln
+
+# .NET 빌드 중간 산출물
+bin/
+obj/
+*.pdb
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+
+# 사람마다 다른 SPT 경로
+LocalSettings.props
+
+# 압축 파일·OS 캐시
+*.zip
+*.7z
+Thumbs.db
+[Dd]esktop.ini
