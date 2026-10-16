@@ -58,7 +58,10 @@ public sealed class K2Mod(CustomItemService customItems, TemplateTable templates
 
         // 2. 외형 확인 — Prefab 경로는 data/items/*.json의 overrideProperties에 적는다(WTT 방식). 여기서는 bundles.json에 있는지만 검사
         var bundleKeys = File.ReadAllText(Path.Combine(folder, "bundles.json"));
-        foreach (var id in new[] { Weapon, Upper, Barrel, Handguard, Muzzle, Stock, Magazine })
+        // 소총 본체는 바닐라 M4A1 프리팹(애니메이션·사운드 원본) — 외형은 클라 플러그인 K2.Client가 본체 메시만 K2로 바꾼다(0.2.0)
+        if (Item(Weapon).Properties?.Prefab?.Path != "assets/content/weapons/m4a1/weapon_colt_m4a1_556x45_container.bundle")
+            throw new InvalidDataException("[K2] 소총 프리팹은 바닐라 M4A1이어야 함: " + Item(Weapon).Properties?.Prefab?.Path);
+        foreach (var id in new[] { Upper, Barrel, Handguard, Muzzle, Stock, Magazine })
         {
             var path = Item(id).Properties?.Prefab?.Path;
             if (string.IsNullOrEmpty(path) || !bundleKeys.Contains($"\"{path}\""))
@@ -104,7 +107,7 @@ public sealed class K2Mod(CustomItemService customItems, TemplateTable templates
         foreach (var slot in Item(DefaultInventory).Properties!.Slots!.Where(s => s.Name is "FirstPrimaryWeapon" or "SecondPrimaryWeapon"))
             foreach (var filter in slot.Properties!.Filters!) filter.Filter!.Add(new MongoId(Weapon));
 
-        logger.Info("[K2] K2 소총·전용 부품 6종 등록 완료 — 피스키퍼 1레벨, 기본 프리셋 'K2 표준'");
+        logger.Info("[K2] K2 소총·전용 부품 6종 등록 완료 — 피스키퍼 1레벨, 기본 프리셋 'K2 표준' / 본체 외형은 클라 플러그인 K2.Client 필요");
         return Task.CompletedTask;
 
         void KeepSlots(string id, params string[] names)

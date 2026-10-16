@@ -8,7 +8,7 @@
   "fleaPriceRoubles": 45000,
   "overrideProperties": {
     "Prefab": {
-      "path": "assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle",
+      "path": "assets/content/weapons/m4a1/weapon_colt_m4a1_556x45_container.bundle",
       "rcid": ""
     },
     "Weight": 1,

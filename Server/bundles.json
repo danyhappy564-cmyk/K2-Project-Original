@@ -8,31 +8,6 @@
       ]
     },
     {
-      "key": "assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle",
-      "dependencyKeys": [
-        "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",
-        "shaders",
-        "cubemaps",
-        "assets/content/weapons/m4a1/weapon_colt_m4a1_556x45_container.bundle",
-        "assets/systems/effects/smoke.bundle",
-        "assets/systems/effects/muzzleflash/muzzleflash.bundle",
-        "assets/systems/effects/heathaze/defaultheathaze.bundle",
-        "assets/content/weapons/wip/kibas tuning prefabs/muzzlejets_templates/default_assets.bundle",
-        "assets/content/weapons/weapon_root_anim_fix.bundle",
-        "assets/content/weapons/m4a1/textures/client_assets.bundle",
-        "assets/content/weapons/m4a1/client_assets.bundle",
-        "assets/content/weapons/animations/spirit_animations.bundle",
-        "assets/content/weapons/animations/simple_animations.bundle",
-        "assets/content/weapons/additional_hands/client_assets.bundle",
-        "assets/content/audio/weapons/m4a1.bundle",
-        "assets/content/audio/weapons/generic",
-        "assets/content/audio/weapons/ak74.bundle",
-        "assets/content/audio/blendoptions/assets.bundle",
-        "assets/content/audio/banks/m4a1.bundle",
-        "assets/commonassets/physics/physicsmaterials.bundle"
-      ]
-    },
-    {
       "key": "assets/content/items/mods/recievers/reciever_daewoo_k2_std.bundle",
       "dependencyKeys": [
         "assets/content/weapons/daewoo_k2/daewoo_k2_textures.bundle",

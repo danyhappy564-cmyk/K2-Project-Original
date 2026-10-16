@@ -45,3 +45,4 @@ Thumbs.db
 
 # 번들은 인게임 확인 뒤 커밋(지금은 Assets-Local 빌드 결과를 복사해 씀)
 Server/bundles/
+Client/bundle/
