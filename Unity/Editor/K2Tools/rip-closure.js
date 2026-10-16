@@ -11,7 +11,8 @@ const sdkScript={};for(const [g,p] of Object.entries(sdk))if(p.endsWith(".cs"))s
 const scriptMap={},missingScripts=[];
 for(const [g,p] of Object.entries(rip))if(p.endsWith(".cs")){const n=path.basename(p,".cs");if(sdkScript[n])scriptMap[g]=sdkScript[n];else missingScripts.push(n);}
 const textExt=/\.(prefab|controller|overrideController|anim|asset|mat|mask)$/;
-const start=walk(path.join(RIP,START_REL||"Content/Weapons/m4a1")).filter(f=>!f.endsWith(".meta"));
+const startPath=path.join(RIP,START_REL||"Content/Weapons/m4a1");
+const start=(fs.statSync(startPath).isFile()?[startPath]:walk(startPath)).filter(f=>!f.endsWith(".meta"));   // 파일 하나 또는 폴더
 const todo=[...start],need=new Set(),reuse=new Set();
 while(todo.length){const f=todo.pop();if(need.has(f))continue;need.add(f);
  if(!textExt.test(f))continue;const t=fs.readFileSync(f,"utf8");

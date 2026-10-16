@@ -17,6 +17,12 @@ namespace K2Tools
     public static partial class K2Builder
     {
         const string M4 = "Assets/K2Ripped/M4A1/Content/Weapons/m4a1/";
+        // 도너(애니메이션·사운드·손 위치의 원본 무기) — 0.3.0부터 SCAR-L(Mk16): 노리쇠에 붙은 측면 장전손잡이·AR식 탄창/멈치가 K2와 가깝다
+        const string DONOR = "Assets/K2Ripped/SCAR/Content/Weapons/scar/";
+        const string DONOR_NAME = "weapon_fn_mk16_556x45";
+        const string HIDE = "";   // Swaps에서 이 값이면 빈 메시로 숨긴다(K2에 없는 도너 부품)
+        // 조준선 보정(m) — all-v007 조준 시점 렌더로 확정(가늠쇠 끝이 화면 중앙). -k2SightDy로 바꿔 시험 가능
+        static float SightDy => float.TryParse(Arg("-k2SightDy"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : 0.0075f;
         const string SRC = "Assets/K2/Source/";
         // 번들 안 에셋 경로를 바닐라 규칙(번들 키와 같은 assets/content/weapons/<무기>/...)에 맞춘다 (body-v003)
         const string OUT = "Assets/Content/Weapons/daewoo_k2/";
@@ -28,20 +34,22 @@ namespace K2Tools
         // 탄창은 뺀다: K2 탄창 본 머리가 탄창 아래쪽이라 M4A1 mod_magazine(탄창 위쪽)과 116mm 어긋났다(body-v001).
         static readonly (string k2, string m4)[] Anchors =
         {
-            ("trigger", "weapon_trigger"), ("selector", "weapon_selector"),
-            ("bolt_release", "weapon_bolt_catch"), ("mag_release_R", "weapon_release"),
+            ("trigger", "mod_trigger_group/mod_trigger"), ("selector", "mod_trigger_group/mod_selector"), ("hammer", "mod_trigger_group/mod_hammer"),
+            ("bolt_release", "mod_catch"), ("mag_release_R", "mod_release"),
         };
         // 참고로만 오차를 기록하는 쌍
         static readonly (string k2, string m4)[] InfoPairs = { ("magazine", "mod_magazine"), ("bolt_carrier", "weapon_bolt") };
-        // M4A1 메시 노드(weapon 기준 경로) → 들어갈 K2 부품
+        // 도너(SCAR) 메시 노드(weapon 기준 경로) → 들어갈 K2 부품(HIDE면 숨김)
         static readonly (string node, string part)[] Swaps =
         {
-            ("weapon_colt_m4a1_556x45_LOD0", "lower"), ("weapon_colt_m4a1_556x45_LOD1", "lower"),
-            ("weapon_bolt", "bolt_carrier"), ("weapon_bolt_catch", "bolt_release"), ("weapon_release", "mag_release_R"),
-            ("weapon_selector", "selector"), ("weapon_trigger", "trigger"),
+            ("weapon_fn_mk16_556x45_LOD0", "lower"), ("weapon_fn_mk16_556x45_LOD1", "lower"),
+            ("weapon_bolt", "bolt_carrier"), ("weapon_bolt/weapon_spring", HIDE),
+            ("mod_catch", "bolt_release"), ("mod_release", "mag_release_R"),
+            ("mod_trigger_group", HIDE), ("mod_trigger_group/mod_hammer", "hammer"),
+            ("mod_trigger_group/mod_selector", "selector"), ("mod_trigger_group/mod_trigger", "trigger"),
         };
-        // 새로 붙이는 메시: (부모 노드, 부품) — M4A1에 대응 노드가 없는 K2 부품
-        static readonly (string parent, string part)[] Extras = { ("", "hammer"), ("weapon_release", "mag_release_L") };
+        // 새로 붙이는 메시: (부모 노드, 부품) — 도너에 대응 노드가 없는 K2 부품
+        static readonly (string parent, string part)[] Extras = { ("mod_release", "mag_release_L") };
 
         static readonly StringBuilder Log = new StringBuilder();
         static void L(string s) { Log.AppendLine(s); Debug.Log("K2BUILD " + s); }
@@ -177,6 +185,10 @@ namespace K2Tools
                     offset = diffs.Aggregate(Vector3.zero, (s, d) => s + d) / diffs.Length;
                     // 좌우는 총 중심선끼리: K2 노리쇠 중심(x) = M4A1 weapon_bolt 중심(x)
                     offset.x = RootPos(weapon.Find("weapon_bolt")).x - parts["bolt_carrier"].localPosition.x;
+                    // 조준선 보정: 조준 카메라(애니메이션 노드라 못 옮김) 높이에 K2 가늠자 구멍 중심이 오도록 K2 전체를 올린다
+                    // (all-v006 조준 시점 렌더에서 구멍 중심이 약 8mm 아래 — 인게임 "조준선 이상" 증상, 8.3mm 시험 후 7.5mm로)
+                    offset.y += SightDy;
+                    L($"조준선 보정 +{SightDy * 1000:0.0} mm");
                     L($"정렬 이동량(K2→M4, m): {offset.x:0.0000} {offset.y:0.0000} {offset.z:0.0000}");
                     foreach (var (k2, m4) in Anchors.Concat(InfoPairs))
                     {
@@ -189,6 +201,12 @@ namespace K2Tools
                 // 1차 인게임(all-v002)에서 노드 회전을 바꿨더니 애니메이션이 원래 회전을 다시 써서 노리쇠가 90° 꺾였다.
                 void Place(Transform t, string part)
                 {
+                    if (part == HIDE)
+                    {
+                        var mfh = t.GetComponent<MeshFilter>(); if (mfh) mfh.sharedMesh = EmptyMesh();
+                        var bch = t.GetComponent<BoxCollider>(); if (bch) bch.size = Vector3.zero;
+                        return;
+                    }
                     var src = parts[part];
                     var nodeM = root.transform.worldToLocalMatrix * t.localToWorldMatrix;   // 본체 공간에서 노드 행렬
                     var mesh = Bake(src.GetComponent<MeshFilter>().sharedMesh, nodeM.inverse * Matrix4x4.Translate(src.localPosition + off), $"{rootName}_{t.name}");
@@ -209,7 +227,7 @@ namespace K2Tools
                     var targets = n.GetComponent<MeshFilter>() || n.GetComponent<BoxCollider>() ? new[] { n }
                         : n.Cast<Transform>().Where(c => c.GetComponent<MeshFilter>() || c.GetComponent<BoxCollider>()).ToArray();
                     foreach (var t in targets) Place(t, part);
-                    L($"  {rootName}: {node} → {part} ({targets.Length}개)");
+                    L($"  {rootName}: {node} → {(part == HIDE ? "숨김" : part)} ({targets.Length}개)");
                 }
                 foreach (var (parent, part) in Extras)
                 {
@@ -231,6 +249,17 @@ namespace K2Tools
                 PrefabUtility.SaveAsPrefabAsset(root, path);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        static Mesh EmptyMesh()
+        {
+            var path = OUT + "Meshes/k2_empty.asset";
+            var m = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            if (m) return m;
+            Directory.CreateDirectory(OUT + "Meshes/");
+            m = new Mesh { name = "k2_empty" };
+            AssetDatabase.CreateAsset(m, path);
+            return m;
         }
 
         // 메시 복사본을 행렬 m(강체 변환)으로 옮겨 에셋으로 저장. 원본 FBX 메시는 그대로.
@@ -259,10 +288,18 @@ namespace K2Tools
                 var wp = root.GetComponents<MonoBehaviour>().FirstOrDefault(c => c && c.GetType().Name == "WeaponPrefab");
                 if (!wp) throw new Exception("WeaponPrefab 없음");
                 var so = new SerializedObject(wp);
+                // WTT-Armory HK417과 같은 형태(0.3.0): 모델 + 재구성 컨트롤러만. fast 데이터·simple·spirit은 비운다
+                // (재구성 컨트롤러에 원본 fast 데이터를 붙이면 상태 번호가 어긋나 애니메이션이 동작하지 않았다 — 0.1.1)
                 so.FindProperty("_weaponObject").objectReferenceValue = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
-                so.FindProperty("_weaponObjectSimple").objectReferenceValue = AssetDatabase.LoadAssetAtPath<GameObject>(simplePath);
+                foreach (var f in new[] { "_weaponObjectSimple", "_animatorSimple", "_animatorSpirit", "_fastAnimatorControllerBinaryData",
+                                          "DefaultMuzzlePrefab", "DefaultSmokeport", "DefaultHeatHazeEffect" })
+                {
+                    var prop = so.FindProperty(f);
+                    if (prop != null) prop.objectReferenceValue = null;   // 총구 효과 3종은 빌드 뒤 바닐라 외부 참조로 채운다(fix_vanilla_refs --only)
+                }
                 so.ApplyModifiedPropertiesWithoutUndo();
-                L("container: _weaponObject/_weaponObjectSimple → K2 모델, 애니메이터는 M4A1 것 유지");
+                var ctrl = so.FindProperty("_originalAnimatorController").objectReferenceValue;
+                L($"container: _weaponObject → K2 모델, 컨트롤러 {(ctrl ? ctrl.name : "없음!")}, fast·simple·spirit·총구효과 비움");
                 PrefabUtility.SaveAsPrefabAsset(root, path);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }

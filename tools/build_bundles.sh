@@ -17,8 +17,9 @@ cp "$REPO"/Unity/Editor/K2Tools/*.cs "$SDK/Assets/Editor/K2Tools/"
 "$UNITY" -batchmode -quit -projectPath "$SDK" -executeMethod K2Tools.K2Builder.BuildAll -k2Out "$B/$VER-raw" -logFile "$B/$VER-unity.log"
 python3 "$REPO/tools/fix_shader_refs.py" "$B/$VER-raw" "$B/$VER-shader" "$GAME"
 mkdir -p "$B/$VER"
-fix() { python3 "$REPO/tools/fix_vanilla_refs.py" "$B/$VER-shader/$1" "$B/$VER/$1" "$GAME/$2" "$3" | tail -1; }
-fix assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle assets/content/weapons/m4a1/weapon_colt_m4a1_556x45_container.bundle "daewoo_k2_556x45=colt_m4a1_556x45"
+fix() { python3 "$REPO/tools/fix_vanilla_refs.py" "$B/$VER-shader/$1" "$B/$VER/$1" "$GAME/$2" "${@:3}" | tail -1; }
+# 컨테이너: WTT 방식 — 재구성한 SCAR 컨트롤러·클립·효과음은 번들 안에 두고, 총구 효과 3종만 바닐라 외부 참조
+fix assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle assets/content/weapons/scar/weapon_fn_mk16_556x45_container.bundle "daewoo_k2_556x45=fn_mk16_556x45" --only DefaultMuzzlePrefab,DefaultSmokeport,DefaultHeatHazeEffect
 fix assets/content/items/mods/recievers/reciever_daewoo_k2_std.bundle assets/content/items/mods/recievers/reciever_ar15_colt_m4a1_std.bundle "reciever_daewoo_k2_std=reciever_ar15_colt_m4a1_std"
 fix assets/content/items/mods/barrels/barrel_daewoo_k2_465mm.bundle assets/content/items/mods/barrels/barrel_ar15_370mm.bundle "barrel_daewoo_k2_465mm=barrel_ar15_370mm"
 fix assets/content/items/mods/handguards/handguard_daewoo_k2_mits_long.bundle assets/content/items/mods/handguards/handguard_ar15_colt_m4_length_std.bundle "handguard_daewoo_k2_mits_long=handguard_ar15_colt_m4_length_std"

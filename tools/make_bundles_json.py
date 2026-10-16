@@ -11,7 +11,7 @@ import UnityPy
 root, validation, game, out = sys.argv[1:5]
 # K2 번들 → 바닐라 템플릿 번들(참조를 옮겨 심은 원본)
 TEMPLATE = {
-    "assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle": "assets/content/weapons/m4a1/weapon_colt_m4a1_556x45_container.bundle",
+    "assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle": "assets/content/weapons/scar/weapon_fn_mk16_556x45_container.bundle",
     "assets/content/items/mods/barrels/barrel_daewoo_k2_465mm.bundle": "assets/content/items/mods/barrels/barrel_ar15_370mm.bundle",
     "assets/content/items/mods/muzzle/muzzle_daewoo_k2_std_556x45.bundle": "assets/content/items/mods/muzzle/muzzle_ar15_colt_usgi_a2_556x45.bundle",
     "assets/content/items/mods/handguards/handguard_daewoo_k2_mits_long.bundle": "assets/content/items/mods/handguards/handguard_ar15_colt_m4_length_std.bundle",
@@ -47,22 +47,20 @@ val = json.load(open(validation, encoding="utf-8"))
 ours = {b["key"]: b["dependencyKeys"] for b in val["bundles"]}
 result, problems = [], []
 for key, own_deps in ours.items():
-    deps = list(own_deps) + ["shaders", "cubemaps"]
-    if key in TEMPLATE:
-        deps += closure(TEMPLATE[key])
-    deps = list(dict.fromkeys(deps))
-    # 검사: 외부 참조 CAB이 의존 번들 중 하나의 CAB인가
+    # 후보 = Unity 의존 + shaders·cubemaps + 바닐라 템플릿과 그 의존. 실제로 참조하는 CAB을 가진 번들만 남긴다(0.3.0 — WTT처럼 최소 의존)
     env = UnityPy.load(os.path.join(root, key))
     needed = set()
     for name, sf in env.file.files.items():
         for e in getattr(sf, "externals", None) or []:
             if e.path.startswith("archive:/"):
                 needed.add(e.path.split("/")[1])
-    have = set()
-    for d in deps:
+    candidates = list(own_deps) + ["shaders", "cubemaps"] + (closure(TEMPLATE[key]) if key in TEMPLATE else [])
+    deps, have = [], set()
+    for d in dict.fromkeys(candidates):
         p = os.path.join(root, d) if d in ours else os.path.join(game, d)
-        if os.path.isfile(p):
-            have |= cab_of_file(p)
+        cabs = cab_of_file(p) if os.path.isfile(p) else set()
+        if d in own_deps or d in ("shaders", "cubemaps") or (cabs & needed):
+            deps.append(d); have |= cabs
     missing = sorted(needed - have)
     if missing:
         problems.append((key, missing))

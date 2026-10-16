@@ -8,13 +8,18 @@
   바닐라 번들 CAB을 외부 참조로 바꿔 넣는다. 프리팹 안의 GameObject·Transform·컴포넌트 참조는 우리 것을 그대로 둔다.
   구조가 다른 필드는 건드리지 않는다(우리 타입트리 기준).
 
-  python tools/fix_vanilla_refs.py <우리 번들(입력)> <출력 번들> <바닐라 번들> [우리이름=바닐라이름 ...]
+  python tools/fix_vanilla_refs.py <우리 번들(입력)> <출력 번들> <바닐라 번들> [우리이름=바닐라이름 ...] [--only 필드1,필드2]
+  --only: 이 이름으로 시작하는 필드만 옮긴다(0.3.0 WTT 방식: 컨테이너의 DefaultMuzzlePrefab·DefaultSmokeport·DefaultHeatHazeEffect만).
 """
 import os, sys, copy
 import UnityPy
 
 src, dst, vpath = sys.argv[1], sys.argv[2], sys.argv[3]
-name_map = dict(a.split("=", 1) for a in sys.argv[4:])
+rest = sys.argv[4:]
+only = None
+if "--only" in rest:
+    i = rest.index("--only"); only = set(rest[i + 1].split(",")); rest = rest[:i] + rest[i + 2:]
+name_map = dict(a.split("=", 1) for a in rest)
 if os.path.exists(dst):
     sys.exit(f"STOP: 이미 있음 — 덮어쓰지 않습니다: {dst}")
 HIER = {"GameObject", "Transform", "RectTransform"}
@@ -125,6 +130,8 @@ for (goname, kind, n), opid in okeys.items():
     changed = 0
     for path, vp in pptrs(vt):
         if path and path[0] in ("m_GameObject", "m_Script"):
+            continue
+        if only is not None and (not path or path[0] not in only):
             continue
         op = get(ot, path)
         if not isinstance(op, dict) or "m_PathID" not in op:

@@ -72,9 +72,9 @@ namespace K2Tools
                 }
 
                 // 1. 본체 (슬롯 mod_reciever·mod_stock을 K2 위치로)
-                var modelPath = Copy(M4 + "weapon_colt_m4a1_556x45_model.generated.prefab", OUT + NAME + "_model.generated.prefab");
-                var simplePath = Copy(M4 + "weapon_colt_m4a1_556x45_model_simple.generated.prefab", OUT + NAME + "_model_simple.generated.prefab");
-                var containerPath = Copy(M4 + "weapon_colt_m4a1_556x45_container.prefab", OUT + NAME + "_container.prefab");
+                var modelPath = Copy(DONOR + DONOR_NAME + "_model.generated.prefab", OUT + NAME + "_model.generated.prefab");
+                var simplePath = Copy(DONOR + DONOR_NAME + "_model_simple.generated.prefab", OUT + NAME + "_model_simple.generated.prefab");
+                var containerPath = Copy(DONOR + DONOR_NAME + "_container.prefab", OUT + NAME + "_container.prefab");
                 Vector3 off = Vector3.zero;
                 EditModel(modelPath, NAME + "_model.generated", parts, mats, ref off, true);
                 EditModel(simplePath, NAME + "_model_simple.generated", parts, mats, ref off, false);
@@ -318,6 +318,19 @@ namespace K2Tools
             tex.ReadPixels(new Rect(0, 0, 2000, 900), 0, 0); tex.Apply();
             File.WriteAllBytes(png, tex.EncodeToPNG());
             L($"조립 미리보기: {png}, 전체 범위 {bnd.size}");
+
+            // 조준 시점: aim_camera 위치에서 앞(+Z)을 좁은 화각으로 — 가늠자·가늠쇠가 화면 가운데 한 줄로 서는지 본다
+            var aim = FindDeep(body.transform, "aim_camera");
+            if (aim)
+            {
+                cam.orthographic = false; cam.fieldOfView = 12; cam.nearClipPlane = 0.01f;
+                cam.transform.position = aim.position; cam.transform.rotation = Quaternion.LookRotation(Vector3.forward, Vector3.up);
+                var rt2 = new RenderTexture(1200, 1200, 24); cam.targetTexture = rt2; cam.Render();
+                RenderTexture.active = rt2; var t2 = new Texture2D(1200, 1200, TextureFormat.RGB24, false);
+                t2.ReadPixels(new Rect(0, 0, 1200, 1200), 0, 0); t2.Apply();
+                File.WriteAllBytes(png.Replace("preview-assembled", "preview-ads"), t2.EncodeToPNG());
+                L($"조준 시점: aim_camera 본체 공간 {body.transform.InverseTransformPoint(aim.position)}");
+            }
         }
     }
 }

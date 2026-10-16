@@ -16,7 +16,10 @@ import UnityPy
 raw, out, game = sys.argv[1], sys.argv[2], sys.argv[3]
 # 셰이더가 비어 있는(추출 때 잃은) 재질은 같은 이름의 바닐라 재질이 쓰는 셰이더로 연결한다 — 템플릿이 의존하던 바닐라 번들
 VANILLA_MATERIAL_SOURCES = ["assets/systems/effects/smoke.bundle", "assets/systems/effects/muzzleflash/muzzleflash.bundle",
-                            "assets/systems/effects/heathaze/defaultheathaze.bundle"]
+                            "assets/systems/effects/heathaze/defaultheathaze.bundle",
+                            # 도너 SCAR 원래 재질(숨긴 스프링 등에 남는 것) — 0.3.0
+                            "assets/content/weapons/scar/weapon_fn_mk16_556x45_container.bundle",
+                            "assets/content/weapons/scar/client_assets.bundle"]
 if os.path.exists(out) and os.listdir(out):
     sys.exit(f"STOP: 출력 폴더가 비어 있지 않음 — 덮어쓰지 않습니다: {out}")
 
