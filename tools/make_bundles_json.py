@@ -24,6 +24,7 @@ manifest = json.load(open(os.path.join(game, "Windows.json"), encoding="utf-8"))
 WTT_MANIFEST = "E:/SPT 4.1/SPT_Runtime/user/mods/WTT-Armory/bundles.json"
 if len(sys.argv) > 5 and sys.argv[5] == "scar":   # 0.8.0 바닐라 SCAR 도너
     TEMPLATE["assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle"] = "assets/content/weapons/scar/weapon_fn_mk16_556x45_container.bundle"
+    TEMPLATE["assets/content/weapons/daewoo_k2/daewoo_k2_scar_fde_container.bundle"] = "assets/content/weapons/scar/weapon_fn_mk16_556x45_fde_container.bundle"   # 0.8.2 복사본(vendor_bundle.py)
 if len(sys.argv) > 5 and sys.argv[5] == "ak5c":
     wtt = {e["key"]: e["dependencyKeys"] for e in json.load(open(WTT_MANIFEST, encoding="utf-8"))["manifest"]}
     TEMPLATE["assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle"] = "WeaponAK5C/weapon_ak5c_container.bundle"

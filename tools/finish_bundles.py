@@ -33,4 +33,13 @@ run('reskin_vanilla.py',donor_container,dst,dst/'reskin-map.json',raw)
 run('fix_container_table.py',raw,container,'assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.prefab')
 os.remove(raw)
 run('fix_part_nodes.py',dst,dst,game,'--inplace',*(['--donor-handguard',WTT/'ak5c_handguard.bundle'] if AK5C else ['--no-palm'] if SCAR else []))
+# 0.8.2 SCAR: 컨트롤러가 든 바닐라 FDE 번들을 우리 키·CAB으로 복사(다른 모드가 바닐라 키를 덮어써도 안 깨지게, vendor_bundle.py)
+if SCAR:
+    VKEY='assets/content/weapons/daewoo_k2/daewoo_k2_scar_fde_container.bundle'
+    run('vendor_bundle.py',game/'assets/content/weapons/scar/weapon_fn_mk16_556x45_fde_container.bundle',dst/VKEY,VKEY,container)
+    val=json.loads((dst/'validation.json').read_text(encoding='utf-8'))
+    for b in val['bundles']:
+        if b['key'].endswith('weapon_daewoo_k2_556x45_container.bundle'):b['dependencyKeys'].append(VKEY)
+    val['bundles'].append({'key':VKEY,'dependencyKeys':[]})
+    (dst/'validation.json').write_text(json.dumps(val,indent=2),encoding='utf-8')
 run('make_bundles_json.py',dst,dst/'validation.json',game,dst/'bundles.json',*([DONOR] if DONOR!='ak101' else []))
