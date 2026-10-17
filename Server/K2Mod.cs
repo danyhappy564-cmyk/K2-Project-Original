@@ -144,6 +144,7 @@ public sealed class K2Mod(CustomItemService customItems, TemplateTable templates
             foreach (var filter in slot.Properties!.Filters!) filter.Filter!.Add(new MongoId(Weapon));
 
         logger.Info($"[K2] K2 소총·전용 부품 {(glOn ? "11종(K201 유탄발사기·GL 핸드가드 포함)" : "9종")} 등록 완료 — 피스키퍼, 기본 프리셋 'K2 표준'");
+        logger.Info("[K2] 높은 산 깊은 골 적막한 산하");
         return Task.CompletedTask;
 
         void CloneItems(string sub)
