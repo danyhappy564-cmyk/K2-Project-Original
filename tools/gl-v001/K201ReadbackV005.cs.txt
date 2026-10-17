@@ -1,0 +1,48 @@
+// 완성 번들의 실제 참조를 로드해 조립·좌표·장전 샘플과 4방향 화면을 검사합니다.
+using System;
+using System.IO;
+using System.Linq;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEditor;
+using Object=UnityEngine.Object;
+namespace K2Tools {
+public static class K201ReadbackV005 {
+ const string Root=K201BuildV002.Root;
+ const string Final=Root+"/Bundles/gl-v001";
+ [Serializable] class Sample {public float time,tubeForwardMm,tubeMeshFollowErrorMm,palmVertexDistanceMm;public Vector3 palm;}
+ [Serializable] class Report {public bool passed;public int meshes,materialsWithoutTexture,clipCount,bindingCount;public float wropPositionErrorMm,wropRotationErrorDegrees;public Vector3 assembledSizeMetres;public string[] slots,aimBindings,wropBindings;public Sample[] samples;public string limitation="게임 내 손 IK·탄착·사운드 미검증. 렌더는 Standard 대체 재질을 사용한 형태 검사입니다.";}
+ static Transform Find(Transform t,string n)=>K201BuildV002.Find(t,n);
+ static void Check(bool ok,string why){if(!ok)throw new Exception(why);}
+ static void Render(Transform root,Vector3 pos,Vector3 target,string name,bool ortho,float size){
+  var go=new GameObject("GL검사카메라");var cam=go.AddComponent<Camera>();cam.transform.position=pos;cam.transform.LookAt(target,Vector3.up);var fill=go.AddComponent<Light>();fill.type=LightType.Directional;fill.intensity=.8f;cam.orthographic=ortho;cam.orthographicSize=size;cam.fieldOfView=55;cam.nearClipPlane=.005f;cam.farClipPlane=10;cam.clearFlags=CameraClearFlags.SolidColor;cam.backgroundColor=new Color(.14f,.16f,.18f);
+  var rt=new RenderTexture(1600,1000,24);cam.targetTexture=rt;cam.Render();RenderTexture.active=rt;var tex=new Texture2D(1600,1000,TextureFormat.RGB24,false);tex.ReadPixels(new Rect(0,0,1600,1000),0,0);tex.Apply();File.WriteAllBytes(Final+"/"+name+".png",tex.EncodeToPNG());RenderTexture.active=null;cam.targetTexture=null;Object.DestroyImmediate(rt);Object.DestroyImmediate(tex);Object.DestroyImmediate(go);
+ }
+ public static void Verify(){try{
+  var r=new Report();var input=JsonUtility.FromJson<K201BuildV002.Input>(File.ReadAllText(Root+"/diagnostics/build-input-v002.json"));K201BuildV002.Load(input.loadPaths.Concat(File.ReadAllLines(Final+"/load-order.txt")));
+  var b=K201BuildV002.Bundle(K201BuildV002.GlKey);Check(b.GetAllAssetNames().Length==1,"컨테이너 등록 수 오류");var container=b.LoadAllAssets<GameObject>().Single();var prefab=K201BuildV002.Model(b);
+  foreach(var f in prefab.GetComponentsInChildren<MeshFilter>(true)){Check(f.sharedMesh&&f.sharedMesh.name.StartsWith("k201_"),"교체되지 않은 메시 "+f.name);r.meshes++;var mr=f.GetComponent<MeshRenderer>();Check(mr,"렌더러 없음");r.materialsWithoutTexture+=mr.sharedMaterials.Count(m=>!m||!m.GetTexture("_MainTex"));}
+  Check(r.meshes>0&&r.materialsWithoutTexture==0,"메시/텍스처 불완전");
+  var body=K201BuildV002.Clone(K201BuildV002.Model(K201BuildV002.Bundle("weapon_daewoo_k2_556x45_container.bundle")).transform);body.transform.SetPositionAndRotation(Vector3.zero,Quaternion.identity);
+  var upper=K201BuildV002.Attach(Find(body.transform,"mod_reciever"),K201BuildV002.Bundle("reciever_daewoo_k2_std.bundle").LoadAllAssets<GameObject>().Single());
+  var barrel=K201BuildV002.Attach(Find(upper,"mod_barrel"),K201BuildV002.Bundle("barrel_daewoo_k2_465mm.bundle").LoadAllAssets<GameObject>().Single());
+  K201BuildV002.Attach(Find(barrel,"mod_muzzle"),K201BuildV002.Bundle("muzzle_daewoo_k2_std_556x45.bundle").LoadAllAssets<GameObject>().Single());
+  K201BuildV002.Attach(Find(body.transform,"mod_stock"),K201BuildV002.Bundle("stock_daewoo_k2_std.bundle").LoadAllAssets<GameObject>().Single());
+  K201BuildV002.Attach(Find(body.transform,"mod_magazine"),K201BuildV002.Bundle("mag_stanag_daewoo_k2_std_556x45_30.bundle").LoadAllAssets<GameObject>().Single());
+  var hg=K201BuildV002.Attach(Find(upper,"mod_handguard"),K201BuildV002.Bundle(K201BuildV002.HgKey).LoadAllAssets<GameObject>().Single());r.slots=hg.GetComponentsInChildren<Transform>(true).Where(t=>t.name.StartsWith("mod_")).Select(t=>t.name).OrderBy(n=>n).ToArray();Check(r.slots.SequenceEqual(new[]{"mod_launcher","mod_scope"}),"GL 슬롯 계약 불일치");
+  var gl=K201BuildV002.Attach(Find(hg,"mod_launcher"),prefab);var weapon=Find(body.transform,"weapon");var wrop=Find(gl,"Weapon_root_original_position");var composed=weapon.worldToLocalMatrix*wrop.localToWorldMatrix;r.wropPositionErrorMm=((Vector3)composed.GetColumn(3)).magnitude*1000;r.wropRotationErrorDegrees=Quaternion.Angle(composed.rotation,Quaternion.identity);Check(r.wropPositionErrorMm<.1f&&r.wropRotationErrorDegrees<.1f,"WROP 부착 합성 오류");
+  var clips=K201BuildV002.Bundle("weapons/m203/client_assets.bundle").LoadAllAssets<AnimationClip>();var audit=JsonUtility.FromJson<Report>(File.ReadAllText(Final+"/clip-binding-audit.json"));r.clipCount=audit.clipCount;r.bindingCount=audit.bindingCount;r.aimBindings=audit.aimBindings;r.wropBindings=audit.wropBindings;Check(audit.passed&&r.bindingCount>0,"클립 해시 검사 실패");
+  var clip=clips.First(c=>c.name=="m203_ammo_in_wpn");var anim=Object.Instantiate(prefab);var animator=anim.GetComponent<Animator>();Check(animator&&animator.avatar,"도너 Avatar 없음");animator.enabled=false;anim.transform.position=new Vector3(10,0,0);var tube=Find(anim.transform,"weapon_tube");var mf=tube.GetComponentsInChildren<MeshFilter>().First();var rest=tube.localPosition;var vertex=mf.sharedMesh.vertices[0];var p0=anim.transform.InverseTransformPoint(mf.transform.TransformPoint(vertex));var samples=new List<Sample>();
+  for(int i=0;i<=20;i++){float time=clip.length*i/20;clip.SampleAnimation(anim,time);var displacement=anim.transform.InverseTransformPoint(mf.transform.TransformPoint(vertex))-p0;var delta=tube.localPosition-rest;var palm=Find(anim.transform,"Base HumanLPalm");var meshes=anim.GetComponentsInChildren<MeshFilter>().Where(f=>f.sharedMesh&&f.sharedMesh.vertexCount>0&&!f.name.Contains("LOD1")).ToArray();float dist=meshes.SelectMany(f=>f.sharedMesh.vertices.Select(v=>f.transform.TransformPoint(v))).Min(v=>Vector3.Distance(v,palm.position));samples.Add(new Sample{time=time,tubeForwardMm=delta.z*1000,tubeMeshFollowErrorMm=(displacement-delta).magnitude*1000,palmVertexDistanceMm=dist*1000,palm=anim.transform.InverseTransformPoint(palm.position)});}
+  r.samples=samples.ToArray();File.WriteAllText(Root+"/diagnostics/animation-samples-v004.json",JsonUtility.ToJson(r,true));Check(r.samples.Max(x=>x.tubeForwardMm)>30,"장전 총열 이동 없음");Check(r.samples.Max(x=>x.tubeMeshFollowErrorMm)<.1f,"총열 메시가 노드를 따르지 않음");Object.DestroyImmediate(anim);
+  var points=body.GetComponentsInChildren<MeshFilter>(true).Where(f=>f.sharedMesh&&f.sharedMesh.vertexCount>0&&!f.name.Contains("LOD1")).SelectMany(f=>f.sharedMesh.vertices.Select(v=>f.transform.TransformPoint(v))).ToArray();var bounds=new Bounds(points[0],Vector3.zero);foreach(var p in points)bounds.Encapsulate(p);r.assembledSizeMetres=bounds.size;Check(bounds.size.z>.9f&&bounds.size.z<1.1f&&bounds.size.x<.2f,"조립 크기 오류");
+  foreach(var mr in body.GetComponentsInChildren<MeshRenderer>(true)){mr.enabled=!mr.name.Contains("LOD1");mr.sharedMaterials=mr.sharedMaterials.Select(m=>{var mat=new Material(Shader.Find("Standard"));mat.color=new Color(.5f,.5f,.5f);mat.SetFloat("_Glossiness",.25f);if(m&&m.HasProperty("_MainTex"))mat.mainTexture=m.GetTexture("_MainTex");return mat;}).ToArray();}
+  var light=new GameObject("검사광원").AddComponent<Light>();light.type=LightType.Directional;light.intensity=1.4f;light.transform.rotation=Quaternion.Euler(35,45,0);RenderSettings.ambientMode=UnityEngine.Rendering.AmbientMode.Flat;RenderSettings.ambientLight=new Color(.65f,.65f,.65f);var center=bounds.center;
+  Render(body.transform,center+new Vector3(-2,0,0),center,"readback-left",true,.36f);Render(body.transform,center+new Vector3(2,0,0),center,"readback-right",true,.36f);Render(body.transform,center+new Vector3(-1.4f,.6f,-1.2f),center,"readback-three-quarter",true,.42f);var aim=Find(gl,"mod_aim_camera");Render(body.transform,aim.position,aim.position+gl.forward,"readback-launcher-aim",false,0);
+  r.passed=true;File.WriteAllText(Final+"/unity-readback.json",JsonUtility.ToJson(r,true));Debug.Log("GL 최종 재읽기 통과 "+JsonUtility.ToJson(r));
+ }catch(Exception e){Debug.LogException(e);EditorApplication.Exit(1);}}
+}
+}
+
+
+

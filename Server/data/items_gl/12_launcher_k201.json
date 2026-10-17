@@ -1,0 +1,31 @@
+{
+  "newId": "d22000000000000000000021",
+  "itemTplToClone": "6357c98711fb55120211f7e1",
+  "parentId": "55818b014bdc2ddc698b456b",
+  "newItemName": "launcher_daewoo_k201_40x46",
+  "handbookParentId": "5b5f752e86f774093e6cb505",
+  "handbookPriceRoubles": 62000,
+  "fleaPriceRoubles": 62000,
+  "overrideProperties": {
+    "Prefab": {
+      "path": "assets/content/weapons/daewoo_k2/launcher_daewoo_k201_40x46_container.bundle",
+      "rcid": ""
+    },
+    "Weight": 1.5,
+    "ConflictingItems": [],
+    "ExaminedByDefault": true,
+    "CanSellOnRagfair": false
+  },
+  "locales": {
+    "en": {
+      "name": "Daewoo K201 40mm underbarrel grenade launcher",
+      "shortName": "K201",
+      "description": "40x46mm single-shot underbarrel grenade launcher for the K2 rifle. Loads by sliding the barrel forward. Mounts on the K2 grenade launcher handguard."
+    },
+    "kr": {
+      "name": "대우정밀 K201 40mm 유탄발사기",
+      "shortName": "K201",
+      "description": "K2 소총용 40x46mm 단발 총열 하부 유탄발사기입니다. 총열을 앞으로 밀어 장전합니다. K2 유탄발사기용 핸드가드에 장착합니다."
+    }
+  }
+}

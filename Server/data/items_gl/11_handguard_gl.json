@@ -1,0 +1,31 @@
+{
+  "newId": "d22000000000000000000020",
+  "itemTplToClone": "5ae30db85acfc408fb139a05",
+  "parentId": "55818a104bdc2db9688b4569",
+  "newItemName": "handguard_daewoo_k2_gl",
+  "handbookParentId": "5b5f75e486f77447ec5d7712",
+  "handbookPriceRoubles": 11000,
+  "fleaPriceRoubles": 11000,
+  "overrideProperties": {
+    "Prefab": {
+      "path": "assets/content/items/mods/handguards/handguard_daewoo_k2_gl.bundle",
+      "rcid": ""
+    },
+    "Weight": 0.42,
+    "ExaminedByDefault": true,
+    "CanSellOnRagfair": false,
+    "ExtraSizeLeft": 0
+  },
+  "locales": {
+    "en": {
+      "name": "Daewoo K2 K201 grenade launcher handguard",
+      "shortName": "K2 GL HG",
+      "description": "Vented K2 handguard with a top rail and a mount for the K201 40mm underbarrel grenade launcher."
+    },
+    "kr": {
+      "name": "대우정밀 K2 K201 유탄발사기용 핸드가드",
+      "shortName": "K2 GL HG",
+      "description": "구멍 뚫린 K2 핸드가드입니다. 상단 레일과 K201 40mm 유탄발사기 장착부가 있습니다."
+    }
+  }
+}

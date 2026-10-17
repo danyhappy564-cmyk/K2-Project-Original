@@ -1,0 +1,14 @@
+{
+  "items": [
+    { "_id": "d22000000000000000000409", "_tpl": "d22000000000000000000020", "parentId": "hideout", "slotId": "hideout", "upd": { "StackObjectsCount": 9999, "UnlimitedCount": true } },
+    { "_id": "d22000000000000000000410", "_tpl": "d22000000000000000000021", "parentId": "hideout", "slotId": "hideout", "upd": { "StackObjectsCount": 9999, "UnlimitedCount": true } }
+  ],
+  "barter_scheme": {
+    "d22000000000000000000409": [[{ "count": 95, "_tpl": "5696686a4bdc2da3298b456a" }]],
+    "d22000000000000000000410": [[{ "count": 480, "_tpl": "5696686a4bdc2da3298b456a" }]]
+  },
+  "loyal_level_items": {
+    "d22000000000000000000409": 1,
+    "d22000000000000000000410": 2
+  }
+}

@@ -1,0 +1,75 @@
+// K201 전용 번들 빌더: 원본을 보존하고 분리 FBX를 도너 노드 좌표로 굽습니다.
+using System;
+using System.IO;
+using System.Linq;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEditor;
+using Object=UnityEngine.Object;
+namespace K2Tools {
+public static class K201BuildV002 {
+ public const string Root="F:/코딩/Index/코덱스방/K2-gl-v001";
+ public const string MeshKey="assets/content/weapons/daewoo_k2/daewoo_k201_meshes.bundle";
+ public const string TexKey="assets/content/weapons/daewoo_k2/daewoo_k2_gl_textures.bundle";
+ public const string HgKey="assets/content/items/mods/handguards/handguard_daewoo_k2_gl.bundle";
+ public const string GlKey="assets/content/weapons/daewoo_k2/launcher_daewoo_k201_40x46_container.bundle";
+ const string Out="Assets/K201V002/";
+ [Serializable] public class Node {public string name;public Vector3 position,scale;public Quaternion rotation;public bool mesh;public Node[] children;}
+ [Serializable] public class Input {public Node[] launcher;public Vector3 offset;public string k2path;public string[] loadPaths;}
+ [Serializable] public class Swap {public string node,model,mesh;public string[] materials;}
+ [Serializable] public class Report {public Vector3 offset,k2Offset,wrop,aim,launcherSlot;public Quaternion wropRotation;public float originErrorMm,upperResidualMm,wropErrorMm,wropErrorDegrees,fireportAheadMm,palmVertexDistanceMm;public bool aimAnimated;public string[] aimBindingClips;public Swap[] swaps;public string[] dependencies;}
+ public static Transform Find(Transform t,string n)=>t.GetComponentsInChildren<Transform>(true).FirstOrDefault(x=>x.name==n);
+ public static Matrix4x4 Rel(Transform root,Transform t)=>root.worldToLocalMatrix*t.localToWorldMatrix;
+ public static GameObject Clone(Transform t) {var g=new GameObject(t.name);g.transform.SetPositionAndRotation(t.localPosition,t.localRotation);g.transform.localScale=t.localScale;var f=t.GetComponent<MeshFilter>();if(f)g.AddComponent<MeshFilter>().sharedMesh=f.sharedMesh;var r=t.GetComponent<MeshRenderer>();if(r)g.AddComponent<MeshRenderer>().sharedMaterials=r.sharedMaterials;foreach(Transform c in t){Clone(c).transform.SetParent(g.transform,false);}return g;}
+ public static void Set(Transform t,Matrix4x4 m){t.localPosition=m.GetColumn(3);t.localRotation=m.rotation;t.localScale=m.lossyScale;}
+ public static GameObject From(Node n){var g=new GameObject(n.name);g.transform.localPosition=n.position;g.transform.localRotation=n.rotation;g.transform.localScale=n.scale;foreach(var c in n.children)From(c).transform.SetParent(g.transform,false);return g;}
+ static Dictionary<string,AssetBundle> loaded=new Dictionary<string,AssetBundle>();
+ public static void Load(IEnumerable<string> paths){foreach(var p0 in paths){var p=p0.Replace('\\','/');if(loaded.ContainsKey(p))continue;var b=AssetBundle.LoadFromFile(p);if(!b)throw new Exception("번들 읽기 실패 "+p);loaded[p]=b;}}
+ public static AssetBundle Bundle(string suffix)=>loaded.First(kv=>kv.Key.EndsWith(suffix,StringComparison.OrdinalIgnoreCase)).Value;
+ public static GameObject Model(AssetBundle b){foreach(var g in b.LoadAllAssets<GameObject>()){var wp=g.GetComponent<WeaponPrefab>();if(wp&&wp._weaponObject)return wp._weaponObject;if(g.name.EndsWith("model.generated"))return g;}throw new Exception("무기 모델 없음 "+b.name);}
+ public static Transform Attach(Transform parent,GameObject prefab){var g=Clone(prefab.transform);g.transform.SetParent(parent,false);g.transform.localPosition=Vector3.zero;g.transform.localRotation=Quaternion.Euler(90,0,0)*prefab.transform.localRotation;return g.transform;}
+ static Mesh Bake(Mesh src,Matrix4x4 m,string name){var mesh=Object.Instantiate(src);mesh.name=name;mesh.vertices=src.vertices.Select(m.MultiplyPoint3x4).ToArray();mesh.normals=src.normals.Select(v=>m.MultiplyVector(v).normalized).ToArray();mesh.tangents=src.tangents.Select(t=>{var v=m.MultiplyVector(new Vector3(t.x,t.y,t.z)).normalized;return new Vector4(v.x,v.y,v.z,t.w);}).ToArray();mesh.RecalculateBounds();return mesh;}
+ static string MaterialKey(Material m)=>m.name.Contains("upper")?"upper":"GL";
+ static (Mesh,string[]) Combined(IEnumerable<MeshFilter> parts,Matrix4x4 target,Vector3 offset,string name){
+  var groups=new Dictionary<string,List<CombineInstance>>();foreach(var f in parts){var mats=f.GetComponent<MeshRenderer>().sharedMaterials;for(int i=0;i<f.sharedMesh.subMeshCount;i++){if(f.sharedMesh.GetIndexCount(i)==0)continue;var k=MaterialKey(mats[i]);if(!groups.ContainsKey(k))groups[k]=new List<CombineInstance>();groups[k].Add(new CombineInstance{mesh=f.sharedMesh,subMeshIndex=i,transform=target.inverse*Matrix4x4.TRS(f.transform.localPosition+offset,f.transform.localRotation,f.transform.localScale)});}}
+  var keys=groups.Keys.ToArray();var sub=new List<CombineInstance>();foreach(var k in keys){var m=new Mesh();m.indexFormat=UnityEngine.Rendering.IndexFormat.UInt32;m.CombineMeshes(groups[k].ToArray(),true,true);sub.Add(new CombineInstance{mesh=m,transform=Matrix4x4.identity});}
+  var result=new Mesh{name=name};result.indexFormat=UnityEngine.Rendering.IndexFormat.UInt32;if(sub.Count>0)result.CombineMeshes(sub.ToArray(),false,true);result.RecalculateBounds();return(result,keys);
+ }
+ static void SaveMesh(Mesh mesh){AssetDatabase.CreateAsset(mesh,Out+mesh.name+".asset");}
+ public static void Build(){try{
+  var input=JsonUtility.FromJson<Input>(File.ReadAllText(Root+"/diagnostics/build-input-v002.json"));var report=new Report{offset=input.offset};
+  if(Directory.Exists(Root+"/Bundles/raw-v002"))throw new Exception("기존 출력 보호");Directory.CreateDirectory(Out);AssetDatabase.Refresh();
+  var importer=(ModelImporter)AssetImporter.GetAtPath("Assets/K2/Source/k2_gl.fbx");importer.isReadable=true;importer.importAnimation=false;importer.SaveAndReimport();
+  var src=Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/K2/Source/k2_gl.fbx"));var old=Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/K2/Source/k2_parts.fbx"));
+  var parts=src.GetComponentsInChildren<MeshFilter>().ToDictionary(f=>f.name.Replace("daewoo_K2_",""));var olds=old.GetComponentsInChildren<MeshFilter>().ToDictionary(f=>f.name.Replace("daewoo_K2_",""));
+  foreach(var kv in parts){if(Quaternion.Angle(kv.Value.transform.localRotation,Quaternion.identity)>.01f||(kv.Value.transform.localScale-Vector3.one).magnitude>.001f)throw new Exception("FBX 축/배율 오류 "+kv.Key);if(olds.ContainsKey(kv.Key))report.originErrorMm=Mathf.Max(report.originErrorMm,Vector3.Distance(kv.Value.transform.localPosition,olds[kv.Key].transform.localPosition)*1000);}
+  if(report.originErrorMm>.01f)throw new Exception("기존 FBX 원점 불일치");
+  Load(input.loadPaths);var body=Clone(Model(Bundle("weapon_daewoo_k2_556x45_container.bundle")).transform);body.transform.SetPositionAndRotation(Vector3.zero,Quaternion.identity);
+  var upperPrefab=Bundle("reciever_daewoo_k2_std.bundle").LoadAllAssets<GameObject>().Single();var upper=Attach(Find(body.transform,"mod_reciever"),upperPrefab);
+  var u=upper.GetComponentsInChildren<MeshFilter>().First(f=>f.name.EndsWith("LOD0"));var uv=u.sharedMesh.vertices.Select(v=>body.transform.InverseTransformPoint(u.transform.TransformPoint(v))).ToArray();var sv=olds["upper"].sharedMesh.vertices.Select(v=>olds["upper"].transform.TransformPoint(v)).ToArray();
+  if(uv.Length!=sv.Length)throw new Exception("상부 정점 수 불일치");var off=uv.Zip(sv,(a,b)=>a-b).Aggregate(Vector3.zero,(a,b)=>a+b)/uv.Length;report.k2Offset=off;report.upperResidualMm=uv.Zip(sv,(a,b)=>Vector3.Distance(a,b+off)).Max()*1000;if(report.upperResidualMm>.1f)throw new Exception("상부 좌표 복원 실패");
+  var hgPath="Assets/K2Ripped/M4Parts/Content/Items/Mods/handguards/handguard_ar15_colt_m4_length_std.prefab";
+  var hg=Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(hgPath));hg.name="handguard_daewoo_k2_gl";var hgSlot=Find(upper,"mod_handguard");var H=Rel(body.transform,hgSlot)*Matrix4x4.Rotate(Quaternion.Euler(90,0,0))*Matrix4x4.Rotate(hg.transform.localRotation);
+  var glModel=input.launcher.First(n=>n.name.EndsWith("model.generated"));var gl=From(glModel);var G=Matrix4x4.Translate(off-input.offset);var weapon=Find(body.transform,"weapon");var wrop=G.inverse*Rel(body.transform,weapon);report.wrop=wrop.GetColumn(3);report.wropRotation=wrop.rotation;
+  var originalWrop=Find(gl.transform,"Weapon_root_original_position");if(Quaternion.Angle(originalWrop.localRotation,wrop.rotation)>.1f)throw new Exception("WROP 회전 전제 불일치");
+  var I=Rel(body.transform,weapon).inverse*G*wrop;report.wropErrorMm=((Vector3)I.GetColumn(3)).magnitude*1000;report.wropErrorDegrees=Quaternion.Angle(I.rotation,Quaternion.identity);
+  var shader=AssetDatabase.LoadAssetAtPath<Shader>("Assets/Shaders/Bumped Specular SMap.shader");var materials=new Dictionary<string,Material>();
+  foreach(var k in new[]{"GL","upper"}){var m=new Material(shader){name="k201_"+k};foreach(var pair in new[]{("_MainTex","main"),("_SpecMap","spec"),("_BumpMap","normal")}){var tex=AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/K2/Source/Textures/daewoo_K2_"+k+"_"+pair.Item2+".png");if(!tex)throw new Exception("텍스처 없음 "+k+pair.Item2);m.SetTexture(pair.Item1,tex);}m.SetFloat("_Glossness",1);m.SetFloat("_Specularness",1);m.SetColor("_Color",Color.white);m.SetColor("_SpecColor",Color.white);m.SetColor("_ReflectColor",new Color(.2924528f,.29107332f,.29107332f,.5019608f));m.SetVector("_DefVals",new Vector4(1,.5f,0,0));m.SetVector("_SpecVals",new Vector4(1,.5f,0,0));AssetDatabase.CreateAsset(m,Out+m.name+".mat");materials[k]=m;}
+  foreach(var f in hg.GetComponentsInChildren<MeshFilter>(true)){var pair=Combined(new[]{parts["GL_handguard"]},H*Rel(hg.transform,f.transform),off,"k201_hg_"+f.name);SaveMesh(pair.Item1);f.sharedMesh=pair.Item1;f.GetComponent<MeshRenderer>().sharedMaterials=pair.Item2.Select(k=>materials[k]).ToArray();var box=f.GetComponent<BoxCollider>();if(box){box.center=pair.Item1.bounds.center;box.size=pair.Item1.bounds.size;}}
+  var sub=Find(hg.transform,"mod_handguard");if(sub)Object.DestroyImmediate(sub.gameObject);
+  var slot=new GameObject("mod_launcher").transform;slot.SetParent(hg.transform,false);Set(slot,H.inverse*G*Matrix4x4.Rotate(gl.transform.localRotation).inverse*Matrix4x4.Rotate(Quaternion.Euler(-90,0,0)));report.launcherSlot=slot.localPosition;if(Quaternion.Angle(slot.localRotation,Quaternion.Euler(270,0,0))>.1f)throw new Exception("런처 슬롯 회전 오류");
+  var hpoints=parts["GL_handguard"].sharedMesh.vertices.Select(v=>v+parts["GL_handguard"].transform.localPosition+off).ToArray();var scope=new GameObject("mod_scope").transform;scope.SetParent(hg.transform,false);scope.localRotation=Quaternion.Euler(270,0,0);scope.localPosition=H.inverse.MultiplyPoint3x4(new Vector3(off.x,hpoints.Max(v=>v.y),Mathf.Clamp(sv.Max(v=>v.z)+off.z-.016f,hpoints.Min(v=>v.z)+.03f,hpoints.Max(v=>v.z)-.03f)));
+  hg.GetComponent<LODGroup>()?.RecalculateBounds();PrefabUtility.SaveAsPrefabAsset(hg,Out+"handguard_daewoo_k2_gl.prefab");
+  var swaps=new List<Swap>();var meshPaths=new List<string>();
+  foreach(var model in input.launcher.Where(n=>n.name.Contains("model"))){var sk=From(model);foreach(var n in sk.GetComponentsInChildren<Transform>(true).Where(t=>t.name.Contains("LOD"))){string[] keys=null;if(n.name.StartsWith("launcher_ar15_colt_m203_40x46_LOD"))keys=new[]{"GL_frame","GL_side_sight","GL_top_sight"};else if(n.name.StartsWith("m203_tube_LOD"))keys=new[]{"GL_tube"};else if(n.name.StartsWith("m203_trigger_LOD"))keys=new[]{"GL_trigger"};else if(n.name.StartsWith("m203_mag_release_LOD"))keys=new[]{"GL_release"};else if(n.name.StartsWith("m203_lock_LOD")||n.name.StartsWith("m203_extractor_LOD"))keys=new string[0];else continue;var meshName="k201_"+(model.name.Contains("simple")?"simple_":"main_")+n.name;var pair=Combined(keys.Select(k=>parts[k]),Rel(sk.transform,n),input.offset,meshName);SaveMesh(pair.Item1);meshPaths.Add(Out+meshName+".asset");swaps.Add(new Swap{node=n.name,model=model.name,mesh=meshName,materials=pair.Item2.Select(k=>materials[k].name).ToArray()});}Object.DestroyImmediate(sk);}
+  report.swaps=swaps.ToArray();report.aim=Find(gl.transform,"mod_aim_camera").localPosition;
+  var clips=Bundle("weapons/m203/client_assets.bundle").LoadAllAssets<AnimationClip>();report.aimBindingClips=clips.Where(c=>AnimationUtility.GetCurveBindings(c).Any(b=>b.path.Contains("mod_aim_camera"))).Select(c=>c.name).ToArray();report.aimAnimated=report.aimBindingClips.Length>0;
+  if(!report.aimAnimated){report.aim=parts["GL_side_sight"].transform.localPosition+input.offset+new Vector3(0,.005f,-.25f);}
+  var tube=parts["GL_tube"];report.fireportAheadMm=(tube.sharedMesh.vertices.Max(v=>v.z)+tube.transform.localPosition.z+input.offset.z-Find(gl.transform,"fireport").localPosition.z)*1000;
+  var palm=Find(gl.transform,"Base HumanLPalm").localPosition;report.palmVertexDistanceMm=new[]{"GL_frame","GL_tube","GL_trigger","GL_release"}.SelectMany(k=>parts[k].sharedMesh.vertices.Select(v=>v+parts[k].transform.localPosition+input.offset)).Min(v=>Vector3.Distance(v,palm))*1000;
+  var builds=new[]{new AssetBundleBuild{assetBundleName=MeshKey,assetNames=meshPaths.ToArray()},new AssetBundleBuild{assetBundleName=TexKey,assetNames=materials.Values.Select(AssetDatabase.GetAssetPath).ToArray()},new AssetBundleBuild{assetBundleName=HgKey,assetNames=new[]{Out+"handguard_daewoo_k2_gl.prefab"},addressableNames=new[]{HgKey.Replace(".bundle",".prefab")}},new AssetBundleBuild{assetBundleName="shaders",assetNames=new[]{"Assets/Shaders/Bumped Specular SMap.shader"}}};
+  AssetDatabase.SaveAssets();Directory.CreateDirectory(Root+"/Bundles/raw-v002");var manifest=BuildPipeline.BuildAssetBundles(Root+"/Bundles/raw-v002",builds,BuildAssetBundleOptions.ChunkBasedCompression,BuildTarget.StandaloneWindows64);if(!manifest)throw new Exception("번들 빌드 실패");
+  report.dependencies=manifest.GetAllDependencies(HgKey);File.WriteAllText(Root+"/diagnostics/build-report-v002.json",JsonUtility.ToJson(report,true));Debug.Log("K201 빌드 완료 "+JsonUtility.ToJson(report));
+ }catch(Exception e){Debug.LogException(e);EditorApplication.Exit(1);}}
+}
+}
