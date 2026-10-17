@@ -7,7 +7,7 @@
 //  - 왼손가락: M4 값 그대로(손잡이 근처에서는 게임이 GripPose로 덮음). 노리쇠: 앞으로 가는 순간까지 최대 후퇴 위치.
 // 출력: catch.json — tools/build_anim.py BAKE_CATCH.
 // 실행: -executeMethod K2Tools.K2AnimBakeCatch.Run -k2Mod <번들 폴더> -k2Game <Windows> -k2Clip <AK 클립>:<프레임 수> -k2Release <x,y,z 무기 좌표>
-//        -k2DonorBody <키> -k2DonorAnim <키> -k2DonorClip <이름> -k2DonorDeps <키;…> -k2Out <폴더> [-k2Press <초>] [-k2Stretch <배>] [-k2Exit <정규화>]
+//        -k2DonorBody <키> -k2DonorAnim <키> -k2DonorClip <이름> -k2DonorDeps <키;…> -k2Out <폴더> [-k2Press <초>] [-k2Stretch <배>] [-k2Exit <정규화>] [-k2ByHand 1] [-k2SmoothR <초>]
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -28,6 +28,25 @@ namespace K2Tools
         static Transform Find(Transform r, string n) => r.GetComponentsInChildren<Transform>(true).First(t => t.name == n);
         const string Anim = "assets/content/weapons/daewoo_k2/anim_v002/k2_ak_overrides.bundle";
         static float Smooth(float a, float b, float x) => Mathf.SmoothStep(0, 1, Mathf.InverseLerp(a, b, x));
+
+
+        static float[] Gauss(int i, int n, int rad, out int lo) { lo = Mathf.Max(0, i - rad); int hi = Mathf.Min(n - 1, i + rad); var w = new float[hi - lo + 1]; for (int j = lo; j <= hi; j++) w[j - lo] = Mathf.Exp(-.5f * Mathf.Pow((j - i) / (rad / 2f), 2)); return w; }
+        static void Smooth3(Vector3[] P, Quaternion[] Q, float sec)
+        {
+            int n = P.Length, rad = Mathf.RoundToInt(sec * 30); if (rad <= 0) return; var P0 = (Vector3[])P.Clone(); var Q0 = (Quaternion[])Q.Clone();
+            for (int i = 1; i < n - 1; i++)
+            {
+                var w = Gauss(i, n, rad, out int lo); Vector3 ps = Vector3.zero; Vector4 qs = Vector4.zero; float ws = 0;
+                for (int k = 0; k < w.Length; k++) { var q = Q0[lo + k]; if (Quaternion.Dot(q, Q0[i]) < 0) q = new Quaternion(-q.x, -q.y, -q.z, -q.w); ps += P0[lo + k] * w[k]; qs += new Vector4(q.x, q.y, q.z, q.w) * w[k]; ws += w[k]; }
+                float edge = Mathf.Min(1, Mathf.Min(i, n - 1 - i) / (float)rad); qs /= ws;
+                P[i] = Vector3.Lerp(P0[i], ps / ws, edge); Q[i] = Quaternion.Slerp(Q0[i], new Quaternion(qs.x, qs.y, qs.z, qs.w).normalized, edge);
+            }
+        }
+        static void SmoothF(float[] F, float sec)
+        {
+            int n = F.Length, rad = Mathf.RoundToInt(sec * 30); if (rad <= 0) return; var F0 = (float[])F.Clone();
+            for (int i = 1; i < n - 1; i++) { var w = Gauss(i, n, rad, out int lo); float s = 0, ws = 0; for (int k = 0; k < w.Length; k++) { s += F0[lo + k] * w[k]; ws += w[k]; } F[i] = Mathf.Lerp(F0[i], s / ws, Mathf.Min(1, Mathf.Min(i, n - 1 - i) / (float)rad)); }
+        }
 
         public static void Run()
         {
@@ -69,6 +88,8 @@ namespace K2Tools
                 dclip.SampleAnimation(dmodel, dclip.length); rep.donorEndToHandMm = Vector3.Distance(dl.localPosition, dhand.localPosition) * 1000;
                 bool byHand = A("-k2ByHand") != null;   // 0.9.10: 손잡이에 붙음 = M4 손이 자기 손 기준점에서 3~10cm(게임 GripPose 10cm와 같은 뜻) — 시작 자세 기준이면 M4가 탄창 넣은 자리에서 출발해도 "손잡이 잡고 시작"이 됐다
                 var shift = rep.k2Release - rep.donorCatch;
+                float smoothR = A("-k2SmoothR") == null ? 0 : float.Parse(A("-k2SmoothR"), CultureInfo.InvariantCulture);
+                var WP = new Vector3[n]; var WR = new Quaternion[n]; var LP = new Vector3[n]; var LR = new Quaternion[n]; var C = new float[n];
                 for (int i = 0; i < n; i++)
                 {
                     // 0.9.9: 누르는 순간 = press(기본 AK 상태 이벤트 BoltOut 0.478 = 0.76초 — 금속 소리), 앞 대기 짧게(접근 M4의 stretch배),
@@ -77,17 +98,22 @@ namespace K2Tools
                     float tm = t <= t0 ? 0 : t <= press ? Mathf.Lerp(0, dr, (t - t0) / Mathf.Max(1e-4f, app)) : Mathf.Lerp(dr, dclip.length, Mathf.Clamp01((t - press) / Mathf.Max(1e-4f, exitT - press)));
                     dclip.SampleAnimation(dmodel, tm);
                     var dRot = dweapon.rotation * Quaternion.Inverse(dR0); var bRot = dRot * kR0; var bPos = dweapon.position + dRot * (kP0 - dP0);
-                    float c = byHand ? Smooth(.03f, .10f, Vector3.Distance(dl.localPosition, dhand.localPosition)) : Smooth(.03f, .08f, Mathf.Min(Vector3.Distance(dl.localPosition, lm0), Vector3.Distance(dl.localPosition, lmEnd)));
-                    var lPos = dl.localPosition + shift; var lRot = dl.localRotation;
-                    var fr = new Frame { time = t, donorTime = tm, weight = c };
+                    C[i] = byHand ? Smooth(.03f, .15f, Vector3.Distance(dl.localPosition, dhand.localPosition)) : Smooth(.03f, .08f, Mathf.Min(Vector3.Distance(dl.localPosition, lm0), Vector3.Distance(dl.localPosition, lmEnd)));
+                    LP[i] = dl.localPosition + shift; LR[i] = dl.localRotation;
+                    var fr = new Frame { time = t, donorTime = tm };
                     foreach (var f in dfingers) fr.fingers.Add(new Bone { name = f.name, rot = f.localEulerAngles });
-                    clip.SampleAnimation(model, t);
                     float e = Smooth(exitT - .15f, exitT, t);
-                    weapon.SetPositionAndRotation(Vector3.Lerp(bPos, weapon.position, e), Quaternion.Slerp(bRot, weapon.rotation, e));
-                    fr.weaponPos = weapon.localPosition; fr.weaponRot = weapon.localEulerAngles;
-                    fr.lPos = Vector3.Lerp(lref.localPosition, lPos, c); fr.lRot = Quaternion.Slerp(lref.localRotation, lRot, c).eulerAngles;
-                    if (t <= press) fr.boltPos = boltRear; else { clip.SampleAnimation(model, Mathf.Min(clip.length, rep.akRelease + (t - press))); fr.boltPos = bolt.localPosition; clip.SampleAnimation(model, t); }   // 노리쇠 앞으로 = 누르는 순간부터 AK 앞 행정
+                    WP[i] = Vector3.Lerp(bPos, kP0, e); WR[i] = Quaternion.Slerp(bRot, kR0, e);   // 끝: 대기 자세(첫 프레임) — 클립 원래 자세가 아니라
+                    if (t <= press) fr.boltPos = boltRear; else { clip.SampleAnimation(model, Mathf.Min(clip.length, rep.akRelease + (t - press))); fr.boltPos = bolt.localPosition; }   // 노리쇠 앞으로 = 누르는 순간부터 AK 앞 행정
                     rep.frames.Add(fr);
+                }
+                // 0.9.11 시간 평활(가우스, -k2SmoothR 초): 손잡이로 돌아갈 때 손 회전 959°/s 튐·1.2초에 툭 멈춤, 총 끝부분 속도 튐(인게임 "프레임 모자람")
+                Smooth3(WP, WR, smoothR); Smooth3(LP, LR, smoothR); SmoothF(C, smoothR);
+                for (int i = 0; i < n; i++)
+                {
+                    var fr = rep.frames[i]; clip.SampleAnimation(model, times[i]);
+                    weapon.SetPositionAndRotation(WP[i], WR[i]); fr.weaponPos = weapon.localPosition; fr.weaponRot = weapon.localEulerAngles; fr.weight = C[i];
+                    fr.lPos = Vector3.Lerp(lref.localPosition, LP[i], C[i]); fr.lRot = Quaternion.Slerp(lref.localRotation, LR[i], C[i]).eulerAngles;
                 }
                 rep.passed = true;
             }

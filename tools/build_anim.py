@@ -39,7 +39,7 @@ BAKE_L = ['F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles
 # 1인칭 손은 팔 뼈가 아니라 IK 마커(weapon_L/R_IK_marker, 총 기준)를 따른다(EFT Player.IkProcess — 마커가 손 기준점 10cm 안이면 손잡이 자세로 빨려 듦).
 # 접기 오른손(0.9.4): 오른손이 손잡이를 놓고 개머리판을 잡아 접은 뒤 돌아오는 마커 궤적(K2AnimBakeFoldR, 총 굴림 거울 뒤 기준). 없으면 건너뜀(1차 빌드).
 BAKE_FOLD_R = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldR-fx11/fold-right.json'   # 0.9.5: G36 오른손 상대 자세 이식(K2AnimBakeFoldDonor)
-BAKE_CATCH = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-catch-c004/catch.json'   # 0.9.6: 빈 탄창 장전 charge_2 → M4식 멈치 때리기(K2AnimBakeCatch)
+BAKE_CATCH = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-catch-c005/catch.json'   # 0.9.6: 빈 탄창 장전 charge_2 → M4식 멈치 때리기(K2AnimBakeCatch)
 SLOT_SWAP = {'ak100_reload_charge_0': 'ak100_reload_charge_2'}   # 0.9.7: 원래 클립 칸 → 이 클립(수정본)으로 재생. 장전 상태는 숙련도(WeaponLevel)로 charge_0·1·2 선택 → 0·2단계 멈치 때리기, 1단계 당기기
 BAKE_FOLD_W = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldW-fx02/fold-weapon.json'   # 0.9.7: G36 총 궤적 80% + 0.4초 평활(K2AnimBakeFoldWeapon -k2Amp 0.8 -k2EndWin .35 -k2Smooth .4) — 0.9.6(100%)은 1.7초에 압축돼 총구 529°/s(G36 171)
 MAG_SEAT = (-0.0001, -0.4402, -0.0241)   # AK 탄창 끼운 자리(무기 좌표)
