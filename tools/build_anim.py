@@ -39,7 +39,8 @@ BAKE_L = ['F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles
 # 1인칭 손은 팔 뼈가 아니라 IK 마커(weapon_L/R_IK_marker, 총 기준)를 따른다(EFT Player.IkProcess — 마커가 손 기준점 10cm 안이면 손잡이 자세로 빨려 듦).
 # 접기 오른손(0.9.4): 오른손이 손잡이를 놓고 개머리판을 잡아 접은 뒤 돌아오는 마커 궤적(K2AnimBakeFoldR, 총 굴림 거울 뒤 기준). 없으면 건너뜀(1차 빌드).
 BAKE_FOLD_R = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldR-fx11/fold-right.json'   # 0.9.5: G36 오른손 상대 자세 이식(K2AnimBakeFoldDonor)
-BAKE_CATCH = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-catch-c005/catch.json'   # 0.9.6: 빈 탄창 장전 charge_2 → M4식 멈치 때리기(K2AnimBakeCatch)
+BAKE_CATCH = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-catch-c006/catch.json'   # 0.9.6: 빈 탄창 장전 charge_2 → M4식 멈치 때리기(K2AnimBakeCatch)
+CATCH_SCALE = 1.1 / 1.6   # 1.0.0: 멈치 때리기 클립 1.6초 → 1.1초(M4 reload_catch 1.17초) — 소리 시각(정규화)도 같이 당겨져 대기 없이 맞춤
 SLOT_SWAP = {'ak100_reload_charge_0': 'ak100_reload_charge_2'}   # 0.9.7: 원래 클립 칸 → 이 클립(수정본)으로 재생. 장전 상태는 숙련도(WeaponLevel)로 charge_0·1·2 선택 → 0·2단계 멈치 때리기, 1단계 당기기
 BAKE_FOLD_W = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldW-fx02/fold-weapon.json'   # 0.9.7: G36 총 궤적 80% + 0.4초 평활(K2AnimBakeFoldWeapon -k2Amp 0.8 -k2EndWin .35 -k2Smooth .4) — 0.9.6(100%)은 1.7초에 압축돼 총구 529°/s(G36 171)
 MAG_SEAT = (-0.0001, -0.4402, -0.0241)   # AK 탄창 끼운 자리(무기 좌표)
@@ -195,6 +196,20 @@ def euler_track(rots, start):
             if best is None or d < best[0]: best = (d, c)
         out.append(best[1]); prev = best[1]
     return out
+
+
+def rescale_time(t, k):
+    """클립 재생 시간을 k배로(1.0.0, 멈치 때리기). 밀집 = 프레임 그대로 샘플레이트 ÷k, 스트림 = 키 시각 ×k·계수 [a,b,c,d] → [a/k³, b/k², c/k, d]
+    (같은 곡선을 빨리 재생), 시작·끝 시각 ×k. 상태 이벤트는 정규화 시각이라 같이 당겨진다. 바이트 수는 그대로라 m_MuscleClipSize 불변."""
+    c = clipdata(t); st = c['m_StreamedClip']; de = c['m_DenseClip']
+    raw = bytearray()
+    for tm, rows in stream_frames(c):
+        raw += struct.pack('<fI', tm * k if abs(tm) < 1e30 else tm, len(rows))
+        for i, (a, b, cc, d) in rows: raw += struct.pack('<I4f', i, a / k ** 3, b / k ** 2, cc / k, d)
+    assert len(raw) == 4 * len(st['data']); st['data'] = list(struct.unpack('<%dI' % (len(raw) // 4), raw))
+    de['m_SampleRate'] /= k; de['m_BeginTime'] *= k
+    t['m_MuscleClip']['m_StartTime'] *= k; t['m_MuscleClip']['m_StopTime'] *= k
+    if 'm_SampleRate' in t: t['m_SampleRate'] /= k
 
 
 def curve_values(t, b, j):
@@ -428,6 +443,7 @@ def main():
                 elif last in fingers and b['attribute'] == 4: put(b, lambda f, nm=last: next(x['rot'] for x in f['fingers'] if x['name'] == nm), True)
                 else: continue
                 row.setdefault('catch', []).append(last + ':' + str(b['attribute']))
+            rescale_time(t, CATCH_SCALE); row['catchScale'] = CATCH_SCALE   # 곡선을 다 쓴 뒤에(쓰기는 원래 프레임 격자 기준)
         changed[ident] = t; changes.append(row)
     assert len(changed) == 98, len(changed)
 

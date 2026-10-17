@@ -7,7 +7,7 @@
 //  - 왼손가락: M4 값 그대로(손잡이 근처에서는 게임이 GripPose로 덮음). 노리쇠: 앞으로 가는 순간까지 최대 후퇴 위치.
 // 출력: catch.json — tools/build_anim.py BAKE_CATCH.
 // 실행: -executeMethod K2Tools.K2AnimBakeCatch.Run -k2Mod <번들 폴더> -k2Game <Windows> -k2Clip <AK 클립>:<프레임 수> -k2Release <x,y,z 무기 좌표>
-//        -k2DonorBody <키> -k2DonorAnim <키> -k2DonorClip <이름> -k2DonorDeps <키;…> -k2Out <폴더> [-k2Press <초>] [-k2Stretch <배>] [-k2Exit <정규화>] [-k2ByHand 1] [-k2SmoothR <초>]
+//        -k2DonorBody <키> -k2DonorAnim <키> -k2DonorClip <이름> -k2DonorDeps <키;…> -k2Out <폴더> [-k2Press <초>] [-k2Stretch <배>] [-k2Exit <정규화>] [-k2ByHand 1] [-k2SmoothR <초>] [-k2Scale <클립 시간 배율>]
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -82,7 +82,10 @@ namespace K2Tools
                 rep.donorRelease = dr;
                 float press = A("-k2Press") == null ? rep.akRelease : float.Parse(A("-k2Press"), CultureInfo.InvariantCulture);
                 float stretch = A("-k2Stretch") == null ? 1.4f : float.Parse(A("-k2Stretch"), CultureInfo.InvariantCulture);
-                float exitT = A("-k2Exit") == null ? clip.length : float.Parse(A("-k2Exit"), CultureInfo.InvariantCulture) * clip.length;
+                // 0.9.11(1.0.0): -k2Scale tsc — build_anim.py가 이 클립을 tsc배 시간으로 재생하게 줄인다(1.6초 → 1.1초, M4 멈치 클립 1.17초).
+                // 상태 이벤트(소리)는 정규화 시각이라 같이 당겨진다. 아래 시각(press·exit·평활)은 줄어든 실제 시간 기준, 프레임 i의 실제 시각 = times[i]·tsc.
+                float tsc = A("-k2Scale") == null ? 1 : float.Parse(A("-k2Scale"), CultureInfo.InvariantCulture);
+                float exitT = (A("-k2Exit") == null ? 1 : float.Parse(A("-k2Exit"), CultureInfo.InvariantCulture)) * clip.length * tsc;
                 dclip.SampleAnimation(dmodel, dclip.length); var lmEnd = dl.localPosition;
                 dclip.SampleAnimation(dmodel, 0); rep.donorStartToHandMm = Vector3.Distance(dl.localPosition, dhand.localPosition) * 1000;
                 dclip.SampleAnimation(dmodel, dclip.length); rep.donorEndToHandMm = Vector3.Distance(dl.localPosition, dhand.localPosition) * 1000;
@@ -94,13 +97,13 @@ namespace K2Tools
                 {
                     // 0.9.9: 누르는 순간 = press(기본 AK 상태 이벤트 BoltOut 0.478 = 0.76초 — 금속 소리), 앞 대기 짧게(접근 M4의 stretch배),
                     // 상태가 빠져나가는 exitT(RELOAD CHARGE END → IDLE 0.92) 전에 M4 끝까지 — 0.9.8은 0.52초 손잡이 대기 후 1.4배 접근이라 "손잡이 잡고 → 멈치"
-                    float t = times[i]; float app = Mathf.Min(press, stretch * dr), t0 = press - app;
+                    float t = times[i] * tsc; float app = Mathf.Min(press, stretch * dr), t0 = press - app;
                     float tm = t <= t0 ? 0 : t <= press ? Mathf.Lerp(0, dr, (t - t0) / Mathf.Max(1e-4f, app)) : Mathf.Lerp(dr, dclip.length, Mathf.Clamp01((t - press) / Mathf.Max(1e-4f, exitT - press)));
                     dclip.SampleAnimation(dmodel, tm);
                     var dRot = dweapon.rotation * Quaternion.Inverse(dR0); var bRot = dRot * kR0; var bPos = dweapon.position + dRot * (kP0 - dP0);
                     C[i] = byHand ? Smooth(.03f, .15f, Vector3.Distance(dl.localPosition, dhand.localPosition)) : Smooth(.03f, .08f, Mathf.Min(Vector3.Distance(dl.localPosition, lm0), Vector3.Distance(dl.localPosition, lmEnd)));
                     LP[i] = dl.localPosition + shift; LR[i] = dl.localRotation;
-                    var fr = new Frame { time = t, donorTime = tm };
+                    var fr = new Frame { time = times[i], donorTime = tm };
                     foreach (var f in dfingers) fr.fingers.Add(new Bone { name = f.name, rot = f.localEulerAngles });
                     float e = Smooth(exitT - .15f, exitT, t);
                     WP[i] = Vector3.Lerp(bPos, kP0, e); WR[i] = Quaternion.Slerp(bRot, kR0, e);   // 끝: 대기 자세(첫 프레임) — 클립 원래 자세가 아니라
@@ -108,7 +111,7 @@ namespace K2Tools
                     rep.frames.Add(fr);
                 }
                 // 0.9.11 시간 평활(가우스, -k2SmoothR 초): 손잡이로 돌아갈 때 손 회전 959°/s 튐·1.2초에 툭 멈춤, 총 끝부분 속도 튐(인게임 "프레임 모자람")
-                Smooth3(WP, WR, smoothR); Smooth3(LP, LR, smoothR); SmoothF(C, smoothR);
+                Smooth3(WP, WR, smoothR / tsc); Smooth3(LP, LR, smoothR / tsc); SmoothF(C, smoothR / tsc);   // 프레임 간격이 tsc/30초라 프레임 수로는 /tsc
                 for (int i = 0; i < n; i++)
                 {
                     var fr = rep.frames[i]; clip.SampleAnimation(model, times[i]);
