@@ -1,5 +1,9 @@
 # 릴리즈 노트
 
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-후원하기-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/real_feels)
+
+모드가 마음에 드셨다면 후원으로 응원해 주세요: https://buymeacoffee.com/real_feels
+
 ## 1.0.0 (테스트 빌드 0.6.1 대비)
 
 SPT 4.1용입니다. 0.6.1과 아이템 ID가 같아서 이미 가지고 있는 K2와 부품은 그대로 남습니다.

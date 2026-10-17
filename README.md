@@ -2,6 +2,10 @@
 
 SPT(Single Player Tarkov) 4.1용 대우 K2 소총 모드입니다.
 
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-후원하기-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/real_feels)
+
+모드가 마음에 드셨다면 후원으로 응원해 주세요: https://buymeacoffee.com/real_feels
+
 ## 구성
 
 - K2 소총과 전용 부품 11종을 추가합니다.
@@ -23,6 +27,10 @@ SPT(Single Player Tarkov) 4.1용 대우 K2 소총 모드입니다.
 2. 이전 버전이 있으면 `SPT_Runtime/user/mods/K2-Project-Original` 폴더를 지웁니다.
 3. zip 안의 `SPT_Runtime` 폴더를 SPT 설치 폴더에 그대로 덮어 복사합니다.
 4. 서버와 게임을 다시 켭니다.
+
+## 후원
+
+모드 제작을 응원해 주시려면 [Buy Me a Coffee](https://buymeacoffee.com/real_feels)에서 후원할 수 있습니다.
 
 ## 라이선스
 
