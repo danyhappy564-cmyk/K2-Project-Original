@@ -56,6 +56,8 @@ namespace K2AnimV002 {
    var rt=new RenderTexture(1200,800,24);camera.targetTexture=rt;camera.Render();RenderTexture.active=rt;var tex=new Texture2D(1200,800,TextureFormat.RGB24,false);tex.ReadPixels(new Rect(0,0,1200,800),0,0);tex.Apply();File.WriteAllBytes(Path.Combine(outdir,file),tex.EncodeToPNG());RenderTexture.active=null;
    UnityEngine.Object.DestroyImmediate(tex);UnityEngine.Object.DestroyImmediate(rt);UnityEngine.Object.DestroyImmediate(camera.gameObject);UnityEngine.Object.DestroyImmediate(textgo);UnityEngine.Object.DestroyImmediate(marks);UnityEngine.Object.DestroyImmediate(model);return bounds.size;
   }
+  // 0.9.7: 의도적으로 바꿔 끼운 칸(tools/build_anim.py SLOT_SWAP) — 숙련도 0단계 빈 탄창 장전을 멈치 때리기 클립으로
+  static readonly Dictionary<string,string> Swap=new Dictionary<string,string>{{"ak100_reload_charge_0","ak100_reload_charge_2"}};
   public static void Run(){
    var report=new Report();outdir=Arg("-k2Out");Directory.CreateDirectory(outdir);
    try{
@@ -68,7 +70,7 @@ namespace K2AnimV002 {
     var before=UnityEngine.Object.Instantiate(wp._weaponObject);var after=UnityEngine.Object.Instantiate(wp._weaponObject);before.GetComponent<Animator>().enabled=false;after.GetComponent<Animator>().enabled=false;
     foreach(var ctrl in new[]{wp._originalAnimatorController,wp._animatorSimple,wp._animatorSpirit}){
      var animator=after.GetComponent<Animator>();animator.enabled=true;animator.runtimeAnimatorController=ctrl;animator.Update(0);if(animator.layerCount!=7)throw new Exception("layers");report.layerCount=animator.layerCount;animator.enabled=false;
-     var pairs=new List<KeyValuePair<AnimationClip,AnimationClip>>();((AnimatorOverrideController)ctrl).GetOverrides(pairs);int linked=pairs.Count(p=>p.Value&&ours.Contains(p.Value));report.controllers.Add(ctrl.name+" slots="+pairs.Count+" custom="+linked);var expectations=JsonUtility.FromJson<Expected>(File.ReadAllText(Arg("-k2Expected"))).controllers.Single(c=>c.name==ctrl.name); foreach(var pair in pairs){var exp=expectations.entries.First(x=>x.original==pair.Key.name);var effective=pair.Value?pair.Value:pair.Key;if(effective.name!=exp.effective || (exp.edited&&!ours.Contains(effective)))throw new Exception("override mismatch "+pair.Key.name+" expected="+exp.effective);}report.overrideControllers++;
+     var pairs=new List<KeyValuePair<AnimationClip,AnimationClip>>();((AnimatorOverrideController)ctrl).GetOverrides(pairs);int linked=pairs.Count(p=>p.Value&&ours.Contains(p.Value));report.controllers.Add(ctrl.name+" slots="+pairs.Count+" custom="+linked);var expectations=JsonUtility.FromJson<Expected>(File.ReadAllText(Arg("-k2Expected"))).controllers.Single(c=>c.name==ctrl.name); foreach(var pair in pairs){var exp=expectations.entries.First(x=>x.original==pair.Key.name);var effective=pair.Value?pair.Value:pair.Key;var want=exp.effective;if(Swap.TryGetValue(want,out var sw))want=sw;if(effective.name!=want || (exp.edited&&!ours.Contains(effective)))throw new Exception("override mismatch "+pair.Key.name+" expected="+exp.effective);}report.overrideControllers++;
     }
     foreach(var clip in ours){ Debug.Log("SAMPLE "+clip.name);
      var original=vanilla[clip.name];var result=new ClipCheck{name=clip.name};var bw=Find(before.transform,"weapon");var aw=Find(after.transform,"weapon");var bc=Find(before.transform,"aim_camera");var ac=Find(after.transform,"aim_camera");bool charge=clip.name.Contains("reload_charge_");

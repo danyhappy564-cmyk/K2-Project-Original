@@ -40,7 +40,8 @@ BAKE_L = ['F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles
 # 접기 오른손(0.9.4): 오른손이 손잡이를 놓고 개머리판을 잡아 접은 뒤 돌아오는 마커 궤적(K2AnimBakeFoldR, 총 굴림 거울 뒤 기준). 없으면 건너뜀(1차 빌드).
 BAKE_FOLD_R = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldR-fr013/fold-right.json'   # 0.9.5: G36 오른손 상대 자세 이식(K2AnimBakeFoldDonor)
 BAKE_CATCH = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-catch-c002/catch.json'   # 0.9.6: 빈 탄창 장전 charge_2 → M4식 멈치 때리기(K2AnimBakeCatch)
-BAKE_FOLD_W = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldW-w002/fold-weapon.json'   # 0.9.6: G36 총 궤적 이식(K2AnimBakeFoldWeapon) — 0.9.5는 개머리판이 얼굴 앞이라 팔이 꺾임
+SLOT_SWAP = {'ak100_reload_charge_0': 'ak100_reload_charge_2'}   # 0.9.7: 원래 클립 칸 → 이 클립(수정본)으로 재생. 장전 상태는 숙련도(WeaponLevel)로 charge_0·1·2 선택 → 0·2단계 멈치 때리기, 1단계 당기기
+BAKE_FOLD_W = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldW-a80s40/fold-weapon.json'   # 0.9.7: G36 총 궤적 80% + 0.4초 평활(K2AnimBakeFoldWeapon -k2Amp 0.8 -k2EndWin .35 -k2Smooth .4) — 0.9.6(100%)은 1.7초에 압축돼 총구 529°/s(G36 171)
 MAG_SEAT = (-0.0001, -0.4402, -0.0241)   # AK 탄창 끼운 자리(무기 좌표)
 # 조정간(0.9.5): K2 조정간 메시를 weapon_selector에 분리(K2Builder, ak-v019) — 노드를 K2 축으로(빌드 출력 selector-pivot.json), 회전은 M16식.
 # 메시는 노드 회전 x 5.85°(AK 프리팹 기본)에서 구웠다 = K2 안전(레버 앞). 단발 = 위로 90°, 연발 = 뒤로 180°(+x축 기준 음수가 앞→위).
@@ -447,16 +448,22 @@ def main():
         co.type_id = typeids[tk]; co.serialized_type = s.types[co.type_id]
         visit(t, lambda p: remap_source(ident[0], p)); co.save_typetree(t); s.objects[pid] = co; added[ident] = co; clipids[ident] = pid
     base_refs = [g.resolve(BASE, p) for p in base.read_typetree()['m_AnimationClips'] if p['m_PathID']]
+    # 칸 바꿔 끼우기(0.9.7): 빈 탄창 장전 상태(RELOAD CHARGE END)는 숙련도(WeaponLevel 0·1·2)로 charge_0·1·2를 고른다 — 멈치 때리기(charge_2)가
+    # 숙련 2단계에서만 나와 인게임에서 계속 당기기만 보였다. M4처럼 초보(0)부터 멈치 때리기: charge_0 칸 → 멈치 때리기 클립. 1단계는 당기기 유지.
+    by_name = {changed[i]['m_Name']: clipids[i] for i in added}
+    swap = {a: by_name[b] for a, b in SLOT_SWAP.items() if b in by_name}
     for o in overrides:
         t = o.read_typetree(); existing = set()
         for pair in t['m_Clips']:
             origin = g.resolve(DONOR, pair['m_OriginalClip']); existing.add((origin[0], origin[1].path_id))
             effective = g.resolve(DONOR, pair['m_OverrideClip']) or origin; eid = (effective[0], effective[1].path_id)
             if eid in added: pair['m_OverrideClip'] = ptr(clipids[eid])
+            for nm in {origin[1].read_typetree()['m_Name'], effective[1].read_typetree()['m_Name']} & set(swap): pair['m_OverrideClip'] = ptr(swap[nm])
         for k, obj in base_refs:
             ident = (k, obj.path_id)
             if ident not in existing and ident in added:
-                t['m_Clips'].append({'m_OriginalClip': ptr(obj.path_id, external(k)), 'm_OverrideClip': ptr(clipids[ident])}); existing.add(ident)
+                nm = changed[ident]['m_Name']
+                t['m_Clips'].append({'m_OriginalClip': ptr(obj.path_id, external(k)), 'm_OverrideClip': ptr(swap.get(nm, clipids[ident]))}); existing.add(ident)
         o.save_typetree(t)
     t = ab.read_typetree(); t['m_Name'] = ANIM; t['m_AssetBundleName'] = ANIM
     allobjs = [*overrides, *added.values()]; t['m_PreloadTable'] = [ptr(o.path_id) for o in allobjs]

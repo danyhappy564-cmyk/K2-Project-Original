@@ -6,6 +6,7 @@
 // 입력 번들은 tools/build_anim.py 1차 결과(총 굴림 거울 적용). 출력: 클립별 프레임마다 weapon 로컬 위치·오일러(Unity) — build_anim.py BAKE_FOLD_W.
 // 실행: -executeMethod K2Tools.K2AnimBakeFoldWeapon.Run -k2Mod <번들 폴더> -k2Game <Windows> -k2Clips <클립:프레임 수 JSON>
 //        -k2Donors <클립=도너 클립 이름=도너 조사 json;…> -k2DonorBody <키> -k2DonorAnim <키> -k2DonorDeps <키;…> -k2Out <폴더>
+//        [-k2Amp <0~1, 움직임 크기>] [-k2EndWin <끝 복귀 초>] [-k2Smooth <시간 평활 초>]
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -32,6 +33,9 @@ namespace K2Tools
             var rep = new Report(); var outDir = A("-k2Out"); Directory.CreateDirectory(outDir);
             try
             {
+                float amp = A("-k2Amp") == null ? 1 : float.Parse(A("-k2Amp"), System.Globalization.CultureInfo.InvariantCulture);
+                float smoothSec = A("-k2Smooth") == null ? 0 : float.Parse(A("-k2Smooth"), System.Globalization.CultureInfo.InvariantCulture);
+                float endWin = A("-k2EndWin") == null ? .15f : float.Parse(A("-k2EndWin"), System.Globalization.CultureInfo.InvariantCulture);
                 var mod = A("-k2Mod"); var game = A("-k2Game"); var loaded = new Dictionary<string, AssetBundle>();
                 AssetBundle Load(string k) { if (loaded.TryGetValue(k, out var b)) return b; var p = Path.Combine(mod, k); if (!File.Exists(p)) p = Path.Combine(game, k); b = AssetBundle.LoadFromFile(p); if (b) loaded[k] = b; return b; }
                 foreach (Match m in Regex.Matches(File.ReadAllText(Path.Combine(mod, "bundles.json")), "\"(assets/[^\"]+|shaders|cubemaps)\"")) Load(m.Groups[1].Value);
@@ -66,6 +70,7 @@ namespace K2Tools
                     clip.SampleAnimation(model, 0); var kP0 = weapon.position; var kR0 = weapon.rotation;
                     var shoulderDiff = shoulder.position - dshoulder.position;   // 어깨 기준으로 맞춤(손–어깨 = G36 → 팔꿈치 각 G36)
                     float tks = Mathf.Max(times[ks], .2f), tke = times[ke], end = clip.length;
+                    var wp_ = new List<Vector3>(); var wr_ = new List<Quaternion>();
                     for (int i = 0; i < n; i++)
                     {
                         float t = times[i], tg;
@@ -79,11 +84,33 @@ namespace K2Tools
                         var goal = dPivot + shoulderDiff;                                          // 경첩 목표
                         float c = Smooth(0, tks, t) * (1 - Smooth(tke, end, t));                    // 경첩 맞춤 비중: 접기 전 서서히, 접은 뒤 서서히 풀기
                         clip.SampleAnimation(model, t);
-                        float e = Smooth(end - .15f, end, t);                                        // 끝: K2 원래 자세로
-                        var pos = Vector3.Lerp(bPos + (goal - bHinge) * c, weapon.position, e); var rot = Quaternion.Slerp(bRot, weapon.rotation, e);
-                        weapon.SetPositionAndRotation(pos, rot);
-                        data.frames.Add(new Frame { time = t, weight = c, angle = ang[i], pos = weapon.localPosition, rot = weapon.localEulerAngles,
-                            hingeWorld = weapon.TransformPoint(hingeLocal), donorPivotWorld = dPivot, shoulder = shoulder.position, donorShoulder = dshoulder.position });
+                        float e = Smooth(end - endWin, end, t);                                      // 끝: K2 원래 자세로
+                        // 크기(amp): K2 클립 원래 자세 ↔ G36식 목표 사이. 0.9.6(amp 1)은 G36 2.27초 움직임을 1.7초에 넣어 총구 각속도 529°/s(G36 171) — 인게임 "휘두름"
+                        var tPos = bPos + (goal - bHinge) * c; var tRot = bRot;
+                        tPos = Vector3.Lerp(weapon.position, tPos, amp); tRot = Quaternion.Slerp(weapon.rotation, tRot, amp);
+                        var pos = Vector3.Lerp(tPos, weapon.position, e); var rot = Quaternion.Slerp(tRot, weapon.rotation, e);
+                        wp_.Add(pos); wr_.Add(rot);
+                        data.frames.Add(new Frame { time = t, weight = c, angle = ang[i], donorPivotWorld = dPivot, shoulder = shoulder.position, donorShoulder = dshoulder.position });
+                    }
+                    // 시간 평활(-k2Smooth 초, 가우스): 압축된 도너 움직임의 각속도 봉우리를 낮춘다. 첫·끝 프레임은 그대로(K2 원래 자세).
+                    int rad = Mathf.RoundToInt(smoothSec * 30);
+                    for (int i = 0; i < n; i++)
+                    {
+                        var P = wp_[i]; var Q = wr_[i];
+                        if (rad > 0 && i > 0 && i < n - 1)
+                        {
+                            Vector3 ps = Vector3.zero; Vector4 qs = Vector4.zero; float ws = 0;
+                            for (int j = Mathf.Max(0, i - rad); j <= Mathf.Min(n - 1, i + rad); j++)
+                            {
+                                float w = Mathf.Exp(-.5f * Mathf.Pow((j - i) / (rad / 2f), 2)); var q = wr_[j]; if (Quaternion.Dot(q, wr_[i]) < 0) q = new Quaternion(-q.x, -q.y, -q.z, -q.w);
+                                ps += wp_[j] * w; qs += new Vector4(q.x, q.y, q.z, q.w) * w; ws += w;
+                            }
+                            float edge = Mathf.Min(1, Mathf.Min(i, n - 1 - i) / (float)rad);   // 끝 근처는 평활을 줄여 끝 자세 유지
+                            qs /= ws; var qa = new Quaternion(qs.x, qs.y, qs.z, qs.w).normalized;
+                            P = Vector3.Lerp(P, ps / ws, edge); Q = Quaternion.Slerp(Q, qa, edge);
+                        }
+                        clip.SampleAnimation(model, times[i]); weapon.SetPositionAndRotation(P, Q);
+                        var fr = data.frames[i]; fr.pos = weapon.localPosition; fr.rot = weapon.localEulerAngles; fr.hingeWorld = weapon.TransformPoint(hingeLocal);
                     }
                     rep.clips.Add(data);
                 }
