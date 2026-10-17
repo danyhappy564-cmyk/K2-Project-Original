@@ -149,6 +149,48 @@
         "assets/content/audio/banks/ak101.bundle",
         "assets/content/weapons/daewoo_k2/anim_v002/k2_ak_overrides.bundle"
       ]
+    },
+    {
+      "key": "assets/content/weapons/daewoo_k2/daewoo_k201_meshes.bundle",
+      "dependencyKeys": []
+    },
+    {
+      "key": "assets/content/weapons/daewoo_k2/daewoo_k2_gl_textures.bundle",
+      "dependencyKeys": [
+        "shaders"
+      ]
+    },
+    {
+      "key": "assets/content/items/mods/handguards/handguard_daewoo_k2_gl.bundle",
+      "dependencyKeys": [
+        "assets/commonassets/physics/physicsmaterials.bundle",
+        "assets/content/items/mods/handguards/handguard_ar15_colt_m4_length_std.bundle",
+        "assets/content/items/mods/handguards/handguard_ar15_kac_ris_textures.bundle",
+        "assets/content/weapons/daewoo_k2/daewoo_k2_gl_textures.bundle",
+        "cubemaps",
+        "shaders"
+      ]
+    },
+    {
+      "key": "assets/content/weapons/daewoo_k2/launcher_daewoo_k201_40x46_container.bundle",
+      "dependencyKeys": [
+        "assets/commonassets/physics/physicsmaterials.bundle",
+        "assets/content/audio/blendoptions/assets.bundle",
+        "assets/content/audio/weapons/generic",
+        "assets/content/audio/weapons/pm.bundle",
+        "assets/content/weapons/animations/simple_animations.bundle",
+        "assets/content/weapons/animations/spirit_animations.bundle",
+        "assets/content/weapons/daewoo_k2/daewoo_k201_meshes.bundle",
+        "assets/content/weapons/daewoo_k2/daewoo_k2_gl_textures.bundle",
+        "assets/content/weapons/m203/client_assets.bundle",
+        "assets/content/weapons/m203/textures/client_assets.bundle",
+        "assets/content/weapons/wip/kibas tuning prefabs/muzzlejets_templates/default_assets.bundle",
+        "assets/systems/effects/heathaze/defaultheathaze.bundle",
+        "assets/systems/effects/muzzleflash/muzzleflash.bundle",
+        "assets/systems/effects/smoke.bundle",
+        "cubemaps",
+        "shaders"
+      ]
     }
   ]
 }
