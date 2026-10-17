@@ -11,7 +11,7 @@
 *.gltf
 Assets-Local/
 Modeling/
-Blender/output/
+
 
 # Unity 캐시·자동 생성 파일 (Unity/ 폴더로 한정 — 손으로 쓴 Server/Client csproj는 커밋 대상)
 Unity/Library/
