@@ -143,6 +143,13 @@ public sealed class K2Mod(CustomItemService customItems, TemplateTable templates
         foreach (var slot in Item(DefaultInventory).Properties!.Slots!.Where(s => s.Name is "FirstPrimaryWeapon" or "SecondPrimaryWeapon"))
             foreach (var filter in slot.Properties!.Filters!) filter.Filter!.Add(new MongoId(Weapon));
 
+        // 7. 무기 숙련도 — K2 독립 항목(기준치는 도너 AK-101이 속한 AK74와 같게). 숙련도 목록에 없으면 게임이 늘 0단계로 본다.
+        //    빈 탄창 장전(AK RELOAD CHARGE END)은 숙련도(WeaponLevel)로 동작을 고른다: 0단계 = 장전손잡이 당기기, 1·2단계 = 노리쇠 멈치 때리기(동작 번들)
+        var masteries = globals.Configuration.Mastering;
+        if (masteries.Any(m => m.Templates.Contains(new MongoId(Weapon)))) throw new InvalidDataException("[K2] 숙련도에 K2가 이미 있음(중복 설치?)");
+        var akMastery = masteries.First(m => m.Name == "AK74");
+        globals.Configuration.Mastering = [.. masteries, new Mastering { Name = "K2", Templates = [new MongoId(Weapon)], Level2 = akMastery.Level2, Level3 = akMastery.Level3 }];
+
         logger.Info($"[K2] K2 소총·전용 부품 {(glOn ? "11종(K201 유탄발사기·GL 핸드가드 포함)" : "9종")} 등록 완료 — 피스키퍼, 기본 프리셋 'K2 표준'");
         logger.Info("[K2] 높은 산 깊은 골 적막한 산하");
         return Task.CompletedTask;

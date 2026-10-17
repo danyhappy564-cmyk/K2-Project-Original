@@ -56,8 +56,8 @@ namespace K2AnimV002 {
    var rt=new RenderTexture(1200,800,24);camera.targetTexture=rt;camera.Render();RenderTexture.active=rt;var tex=new Texture2D(1200,800,TextureFormat.RGB24,false);tex.ReadPixels(new Rect(0,0,1200,800),0,0);tex.Apply();File.WriteAllBytes(Path.Combine(outdir,file),tex.EncodeToPNG());RenderTexture.active=null;
    UnityEngine.Object.DestroyImmediate(tex);UnityEngine.Object.DestroyImmediate(rt);UnityEngine.Object.DestroyImmediate(camera.gameObject);UnityEngine.Object.DestroyImmediate(textgo);UnityEngine.Object.DestroyImmediate(marks);UnityEngine.Object.DestroyImmediate(model);return bounds.size;
   }
-  // 0.9.7: 의도적으로 바꿔 끼운 칸(tools/build_anim.py SLOT_SWAP) — 숙련도 0단계 빈 탄창 장전을 멈치 때리기 클립으로
-  static readonly Dictionary<string,string> Swap=new Dictionary<string,string>{{"ak100_reload_charge_0","ak100_reload_charge_2"}};
+  // 의도적으로 바꿔 끼운 칸(tools/build_anim.py SLOT_SWAP) — 1.0.0: 숙련도 1단계 빈 탄창 장전을 멈치 때리기 클립으로(0단계는 당기기)
+  static readonly Dictionary<string,string> Swap=new Dictionary<string,string>{{"ak100_reload_charge_1","ak100_reload_charge_2"}};
   public static void Run(){
    var report=new Report();outdir=Arg("-k2Out");Directory.CreateDirectory(outdir);
    try{

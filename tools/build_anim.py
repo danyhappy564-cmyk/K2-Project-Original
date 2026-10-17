@@ -41,7 +41,7 @@ BAKE_L = ['F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles
 BAKE_FOLD_R = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldR-fx11/fold-right.json'   # 0.9.5: G36 오른손 상대 자세 이식(K2AnimBakeFoldDonor)
 BAKE_CATCH = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-catch-c007/catch.json'   # 0.9.6: 빈 탄창 장전 charge_2 → M4식 멈치 때리기(K2AnimBakeCatch)
 CATCH_SCALE = 0.8 / 1.6   # 1.0.0: 멈치 때리기 클립 1.6초 → 0.8초(M4 접근 1.2배, 1.1초는 "0.9.9와 비슷") — 소리 시각(정규화)도 같이 당겨져 대기 없이 맞춤
-SLOT_SWAP = {'ak100_reload_charge_0': 'ak100_reload_charge_2'}   # 0.9.7: 원래 클립 칸 → 이 클립(수정본)으로 재생. 장전 상태는 숙련도(WeaponLevel)로 charge_0·1·2 선택 → 0·2단계 멈치 때리기, 1단계 당기기
+SLOT_SWAP = {'ak100_reload_charge_1': 'ak100_reload_charge_2'}   # 1.0.0: 원래 클립 칸 → 이 클립(수정본)으로 재생. 장전 상태는 숙련도(WeaponLevel)로 charge_0·1·2 선택 → 0단계 당기기(charge_0), 1·2단계 멈치 때리기(서버가 K2 독립 숙련도 추가)
 BAKE_FOLD_W = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldW-fx02/fold-weapon.json'   # 0.9.7: G36 총 궤적 80% + 0.4초 평활(K2AnimBakeFoldWeapon -k2Amp 0.8 -k2EndWin .35 -k2Smooth .4) — 0.9.6(100%)은 1.7초에 압축돼 총구 529°/s(G36 171)
 MAG_SEAT = (-0.0001, -0.4402, -0.0241)   # AK 탄창 끼운 자리(무기 좌표)
 # 조정간(0.9.5): K2 조정간 메시를 weapon_selector에 분리(K2Builder, ak-v019) — 노드를 K2 축으로(빌드 출력 selector-pivot.json), 회전은 M16식.
@@ -470,8 +470,8 @@ def main():
         co.type_id = typeids[tk]; co.serialized_type = s.types[co.type_id]
         visit(t, lambda p: remap_source(ident[0], p)); co.save_typetree(t); s.objects[pid] = co; added[ident] = co; clipids[ident] = pid
     base_refs = [g.resolve(BASE, p) for p in base.read_typetree()['m_AnimationClips'] if p['m_PathID']]
-    # 칸 바꿔 끼우기(0.9.7): 빈 탄창 장전 상태(RELOAD CHARGE END)는 숙련도(WeaponLevel 0·1·2)로 charge_0·1·2를 고른다 — 멈치 때리기(charge_2)가
-    # 숙련 2단계에서만 나와 인게임에서 계속 당기기만 보였다. M4처럼 초보(0)부터 멈치 때리기: charge_0 칸 → 멈치 때리기 클립. 1단계는 당기기 유지.
+    # 칸 바꿔 끼우기: 빈 탄창 장전 상태(RELOAD CHARGE END)는 숙련도(WeaponLevel 0·1·2)로 charge_0·1·2를 고른다.
+    # 1.0.0(사용자): 처음(0)은 장전손잡이 당기기, 숙련도가 오르면(1·2) 멈치 때리기 — charge_1 칸 → 멈치 때리기 클립(charge_2 수정본).
     by_name = {changed[i]['m_Name']: clipids[i] for i in added}
     swap = {a: by_name[b] for a, b in SLOT_SWAP.items() if b in by_name}
     for o in overrides:
