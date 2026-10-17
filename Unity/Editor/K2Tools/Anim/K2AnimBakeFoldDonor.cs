@@ -4,7 +4,7 @@
 // 손잡이와의 섞임: 도너 손이 자기 손잡이 자세에서 3~8cm 벗어난 정도(c)로 K2 원래 마커(손잡이)와 섞는다.
 // 입력 번들의 접기 클립은 총 굴림이 이미 거울(tools/build_anim.py 1차 결과)이어야 한다. 출력 형식은 K2AnimBakeFoldR과 같다(build_anim.py BAKE_FOLD_R).
 // 실행: -executeMethod K2Tools.K2AnimBakeFoldDonor.Run -k2Mod <번들 폴더> -k2Game <Windows> -k2Clips <클립:프레임 수 JSON> -k2Donors <클립=도너json;…> -k2Out <폴더>
-//        [-k2Exit <클립=정규화 빠져나가는 시점;…>] [-k2Push <검사기 report.json;…>] — 그 검사에서 오른손–개머리판 틈이 −2mm보다 작은 프레임만큼 손을 개머리판 중심선에서 바깥으로 민다(누적 반복 가능)
+//        [-k2Exit <클립=정규화 빠져나가는 시점;…>] [-k2SmoothR <손 궤적 시간 평활 초>] [-k2Release <클립=다 접은/편 뒤 손 놓는 초;…>] [-k2Push <검사기 report.json;…>] — 그 검사에서 오른손–개머리판 틈이 −2mm보다 작은 프레임만큼 손을 개머리판 중심선에서 바깥으로 민다(누적 반복 가능)
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -42,6 +42,8 @@ namespace K2Tools
                 foreach (var pj in (A("-k2Push") ?? "").Split(';').Where(x => x != ""))
                     foreach (var c in JsonUtility.FromJson<K2ValidationV003C.Validation.Report>(File.ReadAllText(pj)).clips)
                     { if (!push.ContainsKey(c.name)) push[c.name] = new List<(float, Vector3)[]>(); push[c.name].Add(c.frames.Select(f => (f.time, f.rPalmPushStockLocal)).ToArray()); }
+                var releases = (A("-k2Release") ?? "").Split(';').Where(x => x.Contains("=")).ToDictionary(x => x.Split('=')[0], x => float.Parse(x.Split('=')[1], System.Globalization.CultureInfo.InvariantCulture));
+                float smoothR = A("-k2SmoothR") == null ? 0 : float.Parse(A("-k2SmoothR"), System.Globalization.CultureInfo.InvariantCulture);
                 var exits = (A("-k2Exit") ?? "").Split(';').Where(x => x.Contains("=")).ToDictionary(x => x.Split('=')[0], x => float.Parse(x.Split('=')[1], System.Globalization.CultureInfo.InvariantCulture));
                 var donors = A("-k2Donors").Split(';').Where(x => x.Contains("=")).ToDictionary(x => x.Split('=')[0], x => JsonUtility.FromJson<K2ProbeFoldDonor.Report>(File.ReadAllText(x.Substring(x.IndexOf('=') + 1))));
                 var wp = loaded["assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle"].LoadAllAssets<GameObject>().Single().GetComponent<WeaponPrefab>();
@@ -71,6 +73,7 @@ namespace K2Tools
                     var dt = d.frames.Select(f => f.time).ToArray(); var da = d.frames.Select(f => f.angle).ToArray();
                     var (gs, ge) = Motion(da); float dmax = da.Max(), kmax = ang.Max();
                     Vector3 g0 = d.frames[0].rWeaponPos, gEnd = d.frames.Last().rWeaponPos;
+                    var RP = new Vector3[n]; var RR = new Quaternion[n]; var C = new float[n]; float prevTg = 0;
                     for (int i = 0; i < n; i++)
                     {
                         float t = times[i], tg;
@@ -81,6 +84,7 @@ namespace K2Tools
                             float frac = ang[i] / kmax * dmax; int j = gs; while (j < ge && da[j + 1] < frac) j++;
                             tg = Mathf.Lerp(dt[j], dt[Mathf.Min(j + 1, ge)], Mathf.InverseLerp(da[j], da[Mathf.Min(j + 1, ge)], frac));
                         }
+                        tg = Mathf.Max(tg, prevTg); prevTg = tg;   // 0.9.10: 도너 시각은 뒤로 가지 않게 — K2 접힘 각도가 출렁이면 손 자세가 앞뒤로 튀었다(인게임 "덜덜")
                         int a0 = Mathf.Clamp(Array.FindLastIndex(dt, x => x <= tg), 0, dt.Length - 1), a1 = Mathf.Min(a0 + 1, dt.Length - 1); float u = a1 == a0 ? 0 : Mathf.InverseLerp(dt[a0], dt[a1], tg);
                         var f0 = d.frames[a0]; var f1 = d.frames[a1];
                         var relP = Vector3.Lerp(f0.rLocalPos, f1.rLocalPos, u); var relR = Quaternion.Slerp(Quaternion.Euler(f0.rLocalRot), Quaternion.Euler(f1.rLocalRot), u);
@@ -88,10 +92,32 @@ namespace K2Tools
                         float c = Smooth(.03f, .08f, Mathf.Min(Vector3.Distance(wpos, g0), Vector3.Distance(wpos, gEnd)));
                         if (push.TryGetValue(clip.name, out var pl))
                             foreach (var arr in pl) relP += InterpV(arr, t) * c;   // 검사기 PalmPush(개머리판 기준) 누적
-                        var mp = sp[i] + sr[i] * relP; var mr = sr[i] * relR;
                         c *= 1 - Smooth(endT - .1f, endT, t);
+                        if (releases.TryGetValue(clip.name, out var rl)) c *= 1 - Smooth(times[ke], times[ke] + rl, t);   // 0.9.10: 다 편 뒤 손을 곧 놓는다 — 펴진 개머리판 끝(어깨 쪽)에 손이 남아 팔꿈치 40°(G36 75°)
+                        if (i > 0 && Quaternion.Dot(relR, RR[i - 1]) < 0) relR = new Quaternion(-relR.x, -relR.y, -relR.z, -relR.w);
+                        RP[i] = relP; RR[i] = relR; C[i] = c;
+                    }
+                    // 시간 평활(가우스, -k2SmoothR 초)은 개머리판 기준 상대 자세에 — 총 기준에서 하면 빨리 도는 개머리판의 호를 손이 가로질러 속으로 들어간다(−20mm).
+                    // 도너 시각이 출렁여 상대 자세가 튀던 것(오른손 1800°/s)을 없앤다. 첫·끝 프레임은 고정.
+                    int rad = Mathf.RoundToInt(smoothR * 30); var SP = (Vector3[])RP.Clone(); var SR = (Quaternion[])RR.Clone();
+                    for (int i = 1; rad > 0 && i < n - 1; i++)
+                    {
+                        Vector3 ps = Vector3.zero; Vector4 qs = Vector4.zero; float ws = 0;
+                        for (int j = Mathf.Max(0, i - rad); j <= Mathf.Min(n - 1, i + rad); j++)
+                        {
+                            float w = Mathf.Exp(-.5f * Mathf.Pow((j - i) / (rad / 2f), 2)); var qj = RR[j]; if (Quaternion.Dot(qj, RR[i]) < 0) qj = new Quaternion(-qj.x, -qj.y, -qj.z, -qj.w);
+                            ps += RP[j] * w; qs += new Vector4(qj.x, qj.y, qj.z, qj.w) * w; ws += w;
+                        }
+                        float edge = Mathf.Min(1, Mathf.Min(i, n - 1 - i) / (float)rad); qs /= ws;
+                        SP[i] = Vector3.Lerp(RP[i], ps / ws, edge); SR[i] = Quaternion.Slerp(RR[i], new Quaternion(qs.x, qs.y, qs.z, qs.w).normalized, edge);
+                    }
+                    for (int i = 0; i < n; i++)
+                    {
+                        float t = times[i], c = C[i];
+                        var mp = sp[i] + sr[i] * SP[i]; var mr = sr[i] * SR[i];
                         float h = Smooth(endT - .3f, endT, t);   // 끝: 원래 마커 대신 첫 프레임 마커(권총손잡이) — AK 원래 손은 빠져나갈 때 아직 개머리판 쪽
                         var bp = Vector3.Lerp(gp[i], gp[0], h); var br = Quaternion.Slerp(gr[i], gr[0], h);
+                        if (Quaternion.Dot(mr, br) < 0) mr = new Quaternion(-mr.x, -mr.y, -mr.z, -mr.w);
                         marker.localPosition = Vector3.Lerp(bp, mp, c); marker.localRotation = Quaternion.Slerp(br, mr, c);
                         data.frames.Add(new K2AnimBakeFoldR.Frame { time = t, weight = c, angle = ang[i], pos = marker.localPosition, rot = marker.localEulerAngles });
                     }

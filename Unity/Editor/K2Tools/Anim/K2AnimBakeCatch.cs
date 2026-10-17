@@ -23,7 +23,7 @@ namespace K2Tools
     {
         [Serializable] public class Bone { public string name; public Vector3 rot; }
         [Serializable] public class Frame { public float time, donorTime, weight; public Vector3 weaponPos, weaponRot, lPos, lRot, boltPos; public List<Bone> fingers = new List<Bone>(); }
-        [Serializable] public class Report { public bool passed; public string error, clip, donor; public float akRelease, donorRelease; public Vector3 donorCatch, k2Release; public List<Frame> frames = new List<Frame>(); }
+        [Serializable] public class Report { public bool passed; public string error, clip, donor; public float akRelease, donorRelease, donorStartToHandMm, donorEndToHandMm; public Vector3 donorCatch, k2Release; public List<Frame> frames = new List<Frame>(); }
         static string A(string k) { var a = Environment.GetCommandLineArgs(); int i = Array.IndexOf(a, k); return i < 0 ? null : a[i + 1]; }
         static Transform Find(Transform r, string n) => r.GetComponentsInChildren<Transform>(true).First(t => t.name == n);
         const string Anim = "assets/content/weapons/daewoo_k2/anim_v002/k2_ak_overrides.bundle";
@@ -46,7 +46,7 @@ namespace K2Tools
                 var weapon = Find(model.transform, "weapon"); var bolt = Find(model.transform, "weapon_bolt"); var lref = Find(model.transform, "weapon_L_hand_marker");
                 var dwp = Load(A("-k2DonorBody")).LoadAllAssets<GameObject>().Select(g => g.GetComponent<WeaponPrefab>()).First(w => w != null);
                 var dmodel = UnityEngine.Object.Instantiate(dwp._weaponObject); dmodel.GetComponent<Animator>().enabled = false;
-                var dweapon = Find(dmodel.transform, "weapon"); var dbolt = Find(dmodel.transform, "weapon_bolt"); var dcatch = Find(dmodel.transform, "weapon_bolt_catch"); var dl = Find(dmodel.transform, "weapon_L_IK_marker");
+                var dweapon = Find(dmodel.transform, "weapon"); var dbolt = Find(dmodel.transform, "weapon_bolt"); var dcatch = Find(dmodel.transform, "weapon_bolt_catch"); var dl = Find(dmodel.transform, "weapon_L_IK_marker"); var dhand = Find(dmodel.transform, "weapon_L_hand_marker");
                 var dpalm = Find(dmodel.transform, "Base HumanLPalm"); var dfingers = dpalm.GetComponentsInChildren<Transform>().Where(t => t != dpalm).ToArray();
                 var clip = loaded[Anim].LoadAllAssets<AnimationClip>().Single(c => c.name == rep.clip);
                 var dclip = Load(A("-k2DonorAnim")).LoadAllAssets<AnimationClip>().Single(c => c.name == rep.donor);
@@ -65,6 +65,9 @@ namespace K2Tools
                 float stretch = A("-k2Stretch") == null ? 1.4f : float.Parse(A("-k2Stretch"), CultureInfo.InvariantCulture);
                 float exitT = A("-k2Exit") == null ? clip.length : float.Parse(A("-k2Exit"), CultureInfo.InvariantCulture) * clip.length;
                 dclip.SampleAnimation(dmodel, dclip.length); var lmEnd = dl.localPosition;
+                dclip.SampleAnimation(dmodel, 0); rep.donorStartToHandMm = Vector3.Distance(dl.localPosition, dhand.localPosition) * 1000;
+                dclip.SampleAnimation(dmodel, dclip.length); rep.donorEndToHandMm = Vector3.Distance(dl.localPosition, dhand.localPosition) * 1000;
+                bool byHand = A("-k2ByHand") != null;   // 0.9.10: 손잡이에 붙음 = M4 손이 자기 손 기준점에서 3~10cm(게임 GripPose 10cm와 같은 뜻) — 시작 자세 기준이면 M4가 탄창 넣은 자리에서 출발해도 "손잡이 잡고 시작"이 됐다
                 var shift = rep.k2Release - rep.donorCatch;
                 for (int i = 0; i < n; i++)
                 {
@@ -74,7 +77,7 @@ namespace K2Tools
                     float tm = t <= t0 ? 0 : t <= press ? Mathf.Lerp(0, dr, (t - t0) / Mathf.Max(1e-4f, app)) : Mathf.Lerp(dr, dclip.length, Mathf.Clamp01((t - press) / Mathf.Max(1e-4f, exitT - press)));
                     dclip.SampleAnimation(dmodel, tm);
                     var dRot = dweapon.rotation * Quaternion.Inverse(dR0); var bRot = dRot * kR0; var bPos = dweapon.position + dRot * (kP0 - dP0);
-                    float c = Smooth(.03f, .08f, Mathf.Min(Vector3.Distance(dl.localPosition, lm0), Vector3.Distance(dl.localPosition, lmEnd)));
+                    float c = byHand ? Smooth(.03f, .10f, Vector3.Distance(dl.localPosition, dhand.localPosition)) : Smooth(.03f, .08f, Mathf.Min(Vector3.Distance(dl.localPosition, lm0), Vector3.Distance(dl.localPosition, lmEnd)));
                     var lPos = dl.localPosition + shift; var lRot = dl.localRotation;
                     var fr = new Frame { time = t, donorTime = tm, weight = c };
                     foreach (var f in dfingers) fr.fingers.Add(new Bone { name = f.name, rot = f.localEulerAngles });
