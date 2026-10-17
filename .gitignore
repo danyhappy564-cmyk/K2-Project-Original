@@ -13,17 +13,6 @@ Assets-Local/
 Modeling/
 
 
-# Unity 캐시·자동 생성 파일 (Unity/ 폴더로 한정 — 손으로 쓴 Server/Client csproj는 커밋 대상)
-Unity/Library/
-Unity/Logs/
-Unity/Temp/
-Unity/obj/
-Unity/Build/
-Unity/Builds/
-Unity/UserSettings/
-Unity/*.csproj
-Unity/*.sln
-
 # .NET 빌드 중간 산출물
 bin/
 obj/

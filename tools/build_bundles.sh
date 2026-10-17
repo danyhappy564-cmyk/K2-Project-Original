@@ -13,7 +13,8 @@ SDK="F:/코딩/Index/클로드방/EFT-SDK"
 UNITY="/g/Software/Unity2022.3.43f1/Editor/Unity.exe"
 GAME="E:/SPT 4.1/EscapeFromTarkov_Data/StreamingAssets/Windows"   # 읽기 전용
 B="$REPO/Assets-Local/Bundles"
-cp "$REPO"/Unity/Editor/K2Tools/*.cs "$SDK/Assets/Editor/K2Tools/"
+TOOLS="${K2TOOLS:-F:/코딩/레포/Cluade_For_spt/projects/K2-Project-Original/unity-editor/K2Tools}"   # 에디터 도구 원본(2026-10-18 지식 저장소로 옮김)
+cp "$TOOLS"/*.cs "$SDK/Assets/Editor/K2Tools/"
 "$UNITY" -batchmode -quit -projectPath "$SDK" -executeMethod K2Tools.K2Builder.BuildAll -k2Out "$B/$VER-raw" -logFile "$B/$VER-unity.log"
 python3 "$REPO/tools/fix_shader_refs.py" "$B/$VER-raw" "$B/$VER-shader" "$GAME"
 mkdir -p "$B/$VER"
