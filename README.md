@@ -19,7 +19,7 @@ SPT(Single Player Tarkov) 4.1용 대우 K2 소총 모드입니다.
   - 탄창을 곧게 넣기
   - 노리쇠 멈치로 장전
 
-바뀐 내용은 [RELEASE_NOTES.md](RELEASE_NOTES.md)에 있습니다.
+바뀐 내용은 [릴리즈 노트](release-notes/v1.0.0.md)에 있습니다.
 
 ## 설치
 
@@ -27,6 +27,10 @@ SPT(Single Player Tarkov) 4.1용 대우 K2 소총 모드입니다.
 2. 이전 버전이 있으면 `SPT_Runtime/user/mods/K2-Project-Original` 폴더를 지웁니다.
 3. zip 안의 `SPT_Runtime` 폴더를 SPT 설치 폴더에 그대로 덮어 복사합니다.
 4. 서버와 게임을 다시 켭니다.
+
+## 변경 이력
+
+- 2026-10-18 (KST) v1.0.0 — 첫 정식 릴리즈: K201 유탄발사기, 오른쪽 개머리판 접기, 왼쪽 조정간, 탄창 곧게 넣기, 숙련도별 장전([노트](release-notes/v1.0.0.md))
 
 ## 후원
 
