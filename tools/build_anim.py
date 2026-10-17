@@ -38,10 +38,10 @@ BAKE_R = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/
 BAKE_L = ['F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-firemode-v001/ik-curves.json']  # 조정간(총 굴림 거울 뒤) 왼팔 뼈
 # 1인칭 손은 팔 뼈가 아니라 IK 마커(weapon_L/R_IK_marker, 총 기준)를 따른다(EFT Player.IkProcess — 마커가 손 기준점 10cm 안이면 손잡이 자세로 빨려 듦).
 # 접기 오른손(0.9.4): 오른손이 손잡이를 놓고 개머리판을 잡아 접은 뒤 돌아오는 마커 궤적(K2AnimBakeFoldR, 총 굴림 거울 뒤 기준). 없으면 건너뜀(1차 빌드).
-BAKE_FOLD_R = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldR-fr013/fold-right.json'   # 0.9.5: G36 오른손 상대 자세 이식(K2AnimBakeFoldDonor)
-BAKE_CATCH = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-catch-c002/catch.json'   # 0.9.6: 빈 탄창 장전 charge_2 → M4식 멈치 때리기(K2AnimBakeCatch)
+BAKE_FOLD_R = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldR-fx02/fold-right.json'   # 0.9.5: G36 오른손 상대 자세 이식(K2AnimBakeFoldDonor)
+BAKE_CATCH = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-catch-c003/catch.json'   # 0.9.6: 빈 탄창 장전 charge_2 → M4식 멈치 때리기(K2AnimBakeCatch)
 SLOT_SWAP = {'ak100_reload_charge_0': 'ak100_reload_charge_2'}   # 0.9.7: 원래 클립 칸 → 이 클립(수정본)으로 재생. 장전 상태는 숙련도(WeaponLevel)로 charge_0·1·2 선택 → 0·2단계 멈치 때리기, 1단계 당기기
-BAKE_FOLD_W = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldW-a80s40/fold-weapon.json'   # 0.9.7: G36 총 궤적 80% + 0.4초 평활(K2AnimBakeFoldWeapon -k2Amp 0.8 -k2EndWin .35 -k2Smooth .4) — 0.9.6(100%)은 1.7초에 압축돼 총구 529°/s(G36 171)
+BAKE_FOLD_W = 'F:/코딩/Index/클로드방/K2-Project-Original/Assets-Local/Bundles/bake-foldW-fx02/fold-weapon.json'   # 0.9.7: G36 총 궤적 80% + 0.4초 평활(K2AnimBakeFoldWeapon -k2Amp 0.8 -k2EndWin .35 -k2Smooth .4) — 0.9.6(100%)은 1.7초에 압축돼 총구 529°/s(G36 171)
 MAG_SEAT = (-0.0001, -0.4402, -0.0241)   # AK 탄창 끼운 자리(무기 좌표)
 # 조정간(0.9.5): K2 조정간 메시를 weapon_selector에 분리(K2Builder, ak-v019) — 노드를 K2 축으로(빌드 출력 selector-pivot.json), 회전은 M16식.
 # 메시는 노드 회전 x 5.85°(AK 프리팹 기본)에서 구웠다 = K2 안전(레버 앞). 단발 = 위로 90°, 연발 = 뒤로 180°(+x축 기준 음수가 앞→위).

@@ -4,7 +4,7 @@
 // 손잡이와의 섞임: 도너 손이 자기 손잡이 자세에서 3~8cm 벗어난 정도(c)로 K2 원래 마커(손잡이)와 섞는다.
 // 입력 번들의 접기 클립은 총 굴림이 이미 거울(tools/build_anim.py 1차 결과)이어야 한다. 출력 형식은 K2AnimBakeFoldR과 같다(build_anim.py BAKE_FOLD_R).
 // 실행: -executeMethod K2Tools.K2AnimBakeFoldDonor.Run -k2Mod <번들 폴더> -k2Game <Windows> -k2Clips <클립:프레임 수 JSON> -k2Donors <클립=도너json;…> -k2Out <폴더>
-//        [-k2Push <검사기 report.json;…>] — 그 검사에서 오른손–개머리판 틈이 −2mm보다 작은 프레임만큼 손을 개머리판 중심선에서 바깥으로 민다(누적 반복 가능)
+//        [-k2Exit <클립=정규화 빠져나가는 시점;…>] [-k2Push <검사기 report.json;…>] — 그 검사에서 오른손–개머리판 틈이 −2mm보다 작은 프레임만큼 손을 개머리판 중심선에서 바깥으로 민다(누적 반복 가능)
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -42,6 +42,7 @@ namespace K2Tools
                 foreach (var pj in (A("-k2Push") ?? "").Split(';').Where(x => x != ""))
                     foreach (var c in JsonUtility.FromJson<K2ValidationV003C.Validation.Report>(File.ReadAllText(pj)).clips)
                     { if (!push.ContainsKey(c.name)) push[c.name] = new List<(float, Vector3)[]>(); push[c.name].Add(c.frames.Select(f => (f.time, f.rPalmPushStockLocal)).ToArray()); }
+                var exits = (A("-k2Exit") ?? "").Split(';').Where(x => x.Contains("=")).ToDictionary(x => x.Split('=')[0], x => float.Parse(x.Split('=')[1], System.Globalization.CultureInfo.InvariantCulture));
                 var donors = A("-k2Donors").Split(';').Where(x => x.Contains("=")).ToDictionary(x => x.Split('=')[0], x => JsonUtility.FromJson<K2ProbeFoldDonor.Report>(File.ReadAllText(x.Substring(x.IndexOf('=') + 1))));
                 var wp = loaded["assets/content/weapons/daewoo_k2/weapon_daewoo_k2_556x45_container.bundle"].LoadAllAssets<GameObject>().Single().GetComponent<WeaponPrefab>();
                 var model = UnityEngine.Object.Instantiate(wp._weaponObject); model.GetComponent<Animator>().enabled = false;
@@ -66,6 +67,7 @@ namespace K2Tools
                         data.tStart = data.tEnd = -1; rep.clips.Add(data); continue;
                     }
                     var (ks, ke) = Motion(ang); data.tStart = times[ks]; data.tEnd = times[ke];
+                    float endT = exits.TryGetValue(clip.name, out var ex) ? ex * clip.length : clip.length;
                     var dt = d.frames.Select(f => f.time).ToArray(); var da = d.frames.Select(f => f.angle).ToArray();
                     var (gs, ge) = Motion(da); float dmax = da.Max(), kmax = ang.Max();
                     Vector3 g0 = d.frames[0].rWeaponPos, gEnd = d.frames.Last().rWeaponPos;
@@ -73,7 +75,7 @@ namespace K2Tools
                     {
                         float t = times[i], tg;
                         if (i <= ks) tg = Mathf.Lerp(0, dt[gs], ks == 0 ? 1 : (float)i / ks);
-                        else if (i >= ke) tg = Mathf.Lerp(dt[ge], dt.Last(), (t - times[ke]) / Mathf.Max(1e-4f, clip.length - times[ke]));
+                        else if (i >= ke) tg = Mathf.Lerp(dt[ge], dt.Last(), Mathf.Clamp01((t - times[ke]) / Mathf.Max(1e-4f, endT - times[ke])));   // 0.9.9: 빠져나가는 시점까지
                         else
                         {   // 접힘 진행률이 같은 도너 시각
                             float frac = ang[i] / kmax * dmax; int j = gs; while (j < ge && da[j + 1] < frac) j++;
@@ -87,7 +89,10 @@ namespace K2Tools
                         if (push.TryGetValue(clip.name, out var pl))
                             foreach (var arr in pl) relP += InterpV(arr, t) * c;   // 검사기 PalmPush(개머리판 기준) 누적
                         var mp = sp[i] + sr[i] * relP; var mr = sr[i] * relR;
-                        marker.localPosition = Vector3.Lerp(gp[i], mp, c); marker.localRotation = Quaternion.Slerp(gr[i], mr, c);
+                        c *= 1 - Smooth(endT - .1f, endT, t);
+                        float h = Smooth(endT - .3f, endT, t);   // 끝: 원래 마커 대신 첫 프레임 마커(권총손잡이) — AK 원래 손은 빠져나갈 때 아직 개머리판 쪽
+                        var bp = Vector3.Lerp(gp[i], gp[0], h); var br = Quaternion.Slerp(gr[i], gr[0], h);
+                        marker.localPosition = Vector3.Lerp(bp, mp, c); marker.localRotation = Quaternion.Slerp(br, mr, c);
                         data.frames.Add(new K2AnimBakeFoldR.Frame { time = t, weight = c, angle = ang[i], pos = marker.localPosition, rot = marker.localEulerAngles });
                     }
                     rep.clips.Add(data);

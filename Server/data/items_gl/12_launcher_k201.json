@@ -14,7 +14,8 @@
     "Weight": 1.5,
     "ConflictingItems": [],
     "ExaminedByDefault": true,
-    "CanSellOnRagfair": false
+    "CanSellOnRagfair": false,
+    "BlocksFolding": false
   },
   "locales": {
     "en": {

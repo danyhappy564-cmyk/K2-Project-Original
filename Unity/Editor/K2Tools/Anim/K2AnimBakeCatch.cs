@@ -7,7 +7,7 @@
 //  - 왼손가락: M4 값 그대로(손잡이 근처에서는 게임이 GripPose로 덮음). 노리쇠: 앞으로 가는 순간까지 최대 후퇴 위치.
 // 출력: catch.json — tools/build_anim.py BAKE_CATCH.
 // 실행: -executeMethod K2Tools.K2AnimBakeCatch.Run -k2Mod <번들 폴더> -k2Game <Windows> -k2Clip <AK 클립>:<프레임 수> -k2Release <x,y,z 무기 좌표>
-//        -k2DonorBody <키> -k2DonorAnim <키> -k2DonorClip <이름> -k2DonorDeps <키;…> -k2Out <폴더>
+//        -k2DonorBody <키> -k2DonorAnim <키> -k2DonorClip <이름> -k2DonorDeps <키;…> -k2Out <폴더> [-k2Press <초>] [-k2Stretch <배>] [-k2Exit <정규화>]
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -61,12 +61,17 @@ namespace K2Tools
                 rep.donorCatch = dweapon.InverseTransformPoint(dcatch.position); var lm0 = dl.localPosition; float dr = dclip.length;
                 for (int i = 0; i <= dn; i++) { float t = Mathf.Min(i / 60f, dclip.length); dclip.SampleAnimation(dmodel, t); if ((dbolt.localPosition - db0).magnitude > .002f) { dr = t; break; } }
                 rep.donorRelease = dr;
+                float press = A("-k2Press") == null ? rep.akRelease : float.Parse(A("-k2Press"), CultureInfo.InvariantCulture);
+                float stretch = A("-k2Stretch") == null ? 1.4f : float.Parse(A("-k2Stretch"), CultureInfo.InvariantCulture);
+                float exitT = A("-k2Exit") == null ? clip.length : float.Parse(A("-k2Exit"), CultureInfo.InvariantCulture) * clip.length;
                 dclip.SampleAnimation(dmodel, dclip.length); var lmEnd = dl.localPosition;
                 var shift = rep.k2Release - rep.donorCatch;
                 for (int i = 0; i < n; i++)
                 {
-                    float t = times[i]; float app = Mathf.Min(rep.akRelease, 1.4f * dr), t0 = rep.akRelease - app;   // 접근은 M4의 1.4배까지만 늘리고 그 앞은 대기(손잡이)
-                    float tm = t <= t0 ? 0 : t <= rep.akRelease ? Mathf.Lerp(0, dr, (t - t0) / Mathf.Max(1e-4f, app)) : Mathf.Lerp(dr, dclip.length, (t - rep.akRelease) / Mathf.Max(1e-4f, clip.length - rep.akRelease));
+                    // 0.9.9: 누르는 순간 = press(기본 AK 상태 이벤트 BoltOut 0.478 = 0.76초 — 금속 소리), 앞 대기 짧게(접근 M4의 stretch배),
+                    // 상태가 빠져나가는 exitT(RELOAD CHARGE END → IDLE 0.92) 전에 M4 끝까지 — 0.9.8은 0.52초 손잡이 대기 후 1.4배 접근이라 "손잡이 잡고 → 멈치"
+                    float t = times[i]; float app = Mathf.Min(press, stretch * dr), t0 = press - app;
+                    float tm = t <= t0 ? 0 : t <= press ? Mathf.Lerp(0, dr, (t - t0) / Mathf.Max(1e-4f, app)) : Mathf.Lerp(dr, dclip.length, Mathf.Clamp01((t - press) / Mathf.Max(1e-4f, exitT - press)));
                     dclip.SampleAnimation(dmodel, tm);
                     var dRot = dweapon.rotation * Quaternion.Inverse(dR0); var bRot = dRot * kR0; var bPos = dweapon.position + dRot * (kP0 - dP0);
                     float c = Smooth(.03f, .08f, Mathf.Min(Vector3.Distance(dl.localPosition, lm0), Vector3.Distance(dl.localPosition, lmEnd)));
@@ -74,11 +79,11 @@ namespace K2Tools
                     var fr = new Frame { time = t, donorTime = tm, weight = c };
                     foreach (var f in dfingers) fr.fingers.Add(new Bone { name = f.name, rot = f.localEulerAngles });
                     clip.SampleAnimation(model, t);
-                    float e = Smooth(clip.length - .15f, clip.length, t);
+                    float e = Smooth(exitT - .15f, exitT, t);
                     weapon.SetPositionAndRotation(Vector3.Lerp(bPos, weapon.position, e), Quaternion.Slerp(bRot, weapon.rotation, e));
                     fr.weaponPos = weapon.localPosition; fr.weaponRot = weapon.localEulerAngles;
                     fr.lPos = Vector3.Lerp(lref.localPosition, lPos, c); fr.lRot = Quaternion.Slerp(lref.localRotation, lRot, c).eulerAngles;
-                    fr.boltPos = i <= kr ? boltRear : boltK[i];
+                    if (t <= press) fr.boltPos = boltRear; else { clip.SampleAnimation(model, Mathf.Min(clip.length, rep.akRelease + (t - press))); fr.boltPos = bolt.localPosition; clip.SampleAnimation(model, t); }   // 노리쇠 앞으로 = 누르는 순간부터 AK 앞 행정
                     rep.frames.Add(fr);
                 }
                 rep.passed = true;

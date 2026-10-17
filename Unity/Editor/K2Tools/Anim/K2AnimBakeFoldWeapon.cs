@@ -6,7 +6,7 @@
 // 입력 번들은 tools/build_anim.py 1차 결과(총 굴림 거울 적용). 출력: 클립별 프레임마다 weapon 로컬 위치·오일러(Unity) — build_anim.py BAKE_FOLD_W.
 // 실행: -executeMethod K2Tools.K2AnimBakeFoldWeapon.Run -k2Mod <번들 폴더> -k2Game <Windows> -k2Clips <클립:프레임 수 JSON>
 //        -k2Donors <클립=도너 클립 이름=도너 조사 json;…> -k2DonorBody <키> -k2DonorAnim <키> -k2DonorDeps <키;…> -k2Out <폴더>
-//        [-k2Amp <0~1, 움직임 크기>] [-k2EndWin <끝 복귀 초>] [-k2Smooth <시간 평활 초>]
+//        [-k2Amp <0~1, 움직임 크기>] [-k2EndWin <끝 복귀 초>] [-k2Smooth <시간 평활 초>] [-k2Exit <클립=정규화 빠져나가는 시점;…>]
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -34,6 +34,7 @@ namespace K2Tools
             try
             {
                 float amp = A("-k2Amp") == null ? 1 : float.Parse(A("-k2Amp"), System.Globalization.CultureInfo.InvariantCulture);
+                var exits = (A("-k2Exit") ?? "").Split(';').Where(x => x.Contains("=")).ToDictionary(x => x.Split('=')[0], x => float.Parse(x.Split('=')[1], System.Globalization.CultureInfo.InvariantCulture));
                 float smoothSec = A("-k2Smooth") == null ? 0 : float.Parse(A("-k2Smooth"), System.Globalization.CultureInfo.InvariantCulture);
                 float endWin = A("-k2EndWin") == null ? .15f : float.Parse(A("-k2EndWin"), System.Globalization.CultureInfo.InvariantCulture);
                 var mod = A("-k2Mod"); var game = A("-k2Game"); var loaded = new Dictionary<string, AssetBundle>();
@@ -69,13 +70,13 @@ namespace K2Tools
                     dclip.SampleAnimation(dmodel, 0); var dP0 = dweapon.position; var dR0 = dweapon.rotation; var dPiv0 = dweapon.TransformPoint(d.pivotWeapon);
                     clip.SampleAnimation(model, 0); var kP0 = weapon.position; var kR0 = weapon.rotation;
                     var shoulderDiff = shoulder.position - dshoulder.position;   // 어깨 기준으로 맞춤(손–어깨 = G36 → 팔꿈치 각 G36)
-                    float tks = Mathf.Max(times[ks], .2f), tke = times[ke], end = clip.length;
+                    float tks = Mathf.Max(times[ks], .2f), tke = times[ke], end = exits.TryGetValue(clip.name, out var ex) ? ex * clip.length : clip.length;   // 0.9.9: 상태가 빠져나가는 시점(STOCK FOLD 0.853·UNFOLD 0.834)까지 원래 자세로 — 0.9.8은 클립 끝 기준이라 빠져나갈 때 툭 튐
                     var wp_ = new List<Vector3>(); var wr_ = new List<Quaternion>();
                     for (int i = 0; i < n; i++)
                     {
                         float t = times[i], tg;
                         if (i <= ks) tg = Mathf.Lerp(0, dt[gs], ks == 0 ? 1 : (float)i / ks);
-                        else if (i >= ke) tg = Mathf.Lerp(dt[ge], dt.Last(), (t - times[ke]) / Mathf.Max(1e-4f, clip.length - times[ke]));
+                        else if (i >= ke) tg = Mathf.Lerp(dt[ge], dt.Last(), Mathf.Clamp01((t - times[ke]) / Mathf.Max(1e-4f, end - times[ke])));
                         else { float frac = ang[i] / kmax * dmax; int j = gs; while (j < ge && da[j + 1] < frac) j++; tg = Mathf.Lerp(dt[j], dt[Mathf.Min(j + 1, ge)], Mathf.InverseLerp(da[j], da[Mathf.Min(j + 1, ge)], frac)); }
                         dclip.SampleAnimation(dmodel, tg); var dPivot = dweapon.TransformPoint(d.pivotWeapon);
                         var dRot = dweapon.rotation * Quaternion.Inverse(dR0);                      // 도너 움직임(회전)
@@ -88,7 +89,7 @@ namespace K2Tools
                         // 크기(amp): K2 클립 원래 자세 ↔ G36식 목표 사이. 0.9.6(amp 1)은 G36 2.27초 움직임을 1.7초에 넣어 총구 각속도 529°/s(G36 171) — 인게임 "휘두름"
                         var tPos = bPos + (goal - bHinge) * c; var tRot = bRot;
                         tPos = Vector3.Lerp(weapon.position, tPos, amp); tRot = Quaternion.Slerp(weapon.rotation, tRot, amp);
-                        var pos = Vector3.Lerp(tPos, weapon.position, e); var rot = Quaternion.Slerp(tRot, weapon.rotation, e);
+                        var pos = Vector3.Lerp(tPos, kP0, e); var rot = Quaternion.Slerp(tRot, kR0, e);   // 끝: 대기 자세(첫 프레임) — AK 원래 클립은 빠져나갈 때 총이 ~40° 기울어 있어 그쪽으로 가면 끝에서 다시 튄다
                         wp_.Add(pos); wr_.Add(rot);
                         data.frames.Add(new Frame { time = t, weight = c, angle = ang[i], donorPivotWorld = dPivot, shoulder = shoulder.position, donorShoulder = dshoulder.position });
                     }
@@ -109,7 +110,7 @@ namespace K2Tools
                             qs /= ws; var qa = new Quaternion(qs.x, qs.y, qs.z, qs.w).normalized;
                             P = Vector3.Lerp(P, ps / ws, edge); Q = Quaternion.Slerp(Q, qa, edge);
                         }
-                        clip.SampleAnimation(model, times[i]); weapon.SetPositionAndRotation(P, Q);
+                        clip.SampleAnimation(model, times[i]); { float z = Smooth(end - .1f, end, times[i]); P = Vector3.Lerp(P, kP0, z); Q = Quaternion.Slerp(Q, kR0, z); } weapon.SetPositionAndRotation(P, Q);
                         var fr = data.frames[i]; fr.pos = weapon.localPosition; fr.rot = weapon.localEulerAngles; fr.hingeWorld = weapon.TransformPoint(hingeLocal);
                     }
                     rep.clips.Add(data);
